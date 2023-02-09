@@ -1,0 +1,27 @@
+name: learn2thermML
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - dvc=2.27.2
+  - dvc-data=0.10.0
+  - dvc-http=2.19.1
+  - dvc-objects=0.4.0
+  - dvc-render=0.0.11
+  - dvc-ssh=2.19.0
+  - dvc-task=0.1.2
+  - filelock=3.8.0
+  - matplotlib=3.6.0
+  - pandas=1.5.0
+  - python=3.10.6
+  - pyyaml=6.0
+  - seaborn-base=0.12.0
+  - tensorflow=2.11.0
+  - pytorch=1.13.1
+  - transformers=4.26.0
+  - pip
+  - pip:
+    - duckdb
+    - codecarbon==2.1.4
+    - dvclive==0.11.0
+
