@@ -1,0 +1,6 @@
+ogt_protein_classifier_train_evaluate:
+  split_type: 'random'
+  ogt_window: (40.0, 60.0)
+  balance: true
+  model: 'protbert'
+  protocol: 'head'

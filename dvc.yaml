@@ -1,0 +1,16 @@
+stages:
+  ogt_protein_classifier_train_evaluate:
+    cmd: python pipeline/ogt_protein_classifier_train_evaluate.py
+    deps:
+    - ./pipeline/ogt_protein_classifier_train_evaluate.py
+    - ./data/database
+    outs:
+    - ./data/models/ogt_cfr
+    params:
+    - ogt_protein_classifier_train_evaluate.split_type
+    - ogt_protein_classifier_train_evaluate.ogt_window
+    - ogt_protein_classifier_train_evaluate.balance
+    - ogt_protein_classifier_train_evaluate.model
+    - ogt_protein_classifier_train_evaluate.protocol
+    metrics:
+    - ./data/metrics/ogt_protein_classifier_train_evaluate.yaml
