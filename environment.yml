@@ -20,9 +20,10 @@ dependencies:
   - tensorflow=2.11.0
   - pytorch=1.13.1
   - transformers=4.26.0
+  - evaluate
   - pip
   - pip:
-    - duckdb
+    - duckdb==0.7.0
     - codecarbon==2.1.4
     - dvclive==0.11.0
 
