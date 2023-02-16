@@ -1,0 +1,11 @@
+md5: d2802fd5fa6cd84f47b44ab8d681a5e5
+frozen: true
+deps:
+- path: ./data/database
+  repo:
+    url: ../learn2thermDB
+    rev_lock: 640604381a9610fd6e5d4290efd019e98b84ba38
+outs:
+- md5: 3d1fb0c6b918014c9959ebab31ca9c32
+  size: 34096820224
+  path: database
