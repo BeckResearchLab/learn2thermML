@@ -20,7 +20,7 @@ import numpy as np
 import duckdb as ddb
 import re
 
-from datasets import Dataset
+import datasets
 import transformers
 import torch
 import evaluate
@@ -32,20 +32,40 @@ import logging
 
 if 'LOGLEVEL' in os.environ:
     LOGLEVEL = os.environ['LOGLEVEL']
-    LOGLEVEL = getattr(logging, LOGLEVEL)
 else:
-    LOGLEVEL = logging.INFO
+    LOGLEVEL = 'INFO'
 LOGNAME = __file__
 LOGFILE = f'./logs/{os.path.basename(__file__)}.log'
+
+class ImbalanceTrainer(transformers.Trainer):
+    """Trainer using cross entropy loss with imbalanced classes."""
+    def __init__(self, class_weights, *args, **kwargs):
+        self._class_weights = class_weights
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        if self._class_weights is None:
+            return super().compute_loss(model, inputs, return_outputs)
+        labels = inputs.get("labels")
+        # forward pass
+        outputs = model(**inputs)
+        logits = outputs.get("logits")
+        loss_fct = torch.nn.CrossEntropyLoss(weight=torch.tensor(list(self._class_weights.values())))
+        loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
+        return (loss, outputs) if return_outputs else loss
 
 if __name__ == '__main__':
     # start logger
     logger = logging.getLogger(LOGNAME)
-    logger.setLevel(LOGLEVEL)
+    logger.setLevel(getattr(logging, LOGLEVEL))
     fh = logging.FileHandler(LOGFILE, mode='w')
     formatter = logging.Formatter('%(filename)-12s %(funcName)-12s: %(levelname)-8s %(message)s')
     fh.setFormatter(formatter)
     logger.addHandler(fh)
+    datasets.utils.logging.set_verbosity(LOGLEVEL)
+    transformers.utils.logging.set_verbosity(LOGLEVEL)
+    transformers.utils.logging.enable_default_handler()
+    transformers.utils.logging.enable_explicit_format()
 
     # get device
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -58,7 +78,7 @@ if __name__ == '__main__':
 
     # get the data
     conn = ddb.connect("./data/database")
-    ds = Dataset.from_sql(
+    ds = datasets.Dataset.from_sql(
         """SELECT 
             proteins.protein_int_index,
             proteins.protein_seq,
@@ -69,7 +89,7 @@ if __name__ == '__main__':
         INNER JOIN taxa ON (proteins.taxa_index=taxa.taxa_index)
         WHERE proteins.protein_len<250
         AND taxa.ogt IS NOT NULL
-        USING SAMPLE 10000""",
+        USING SAMPLE 5000""",
         config_name='test',
         cache_dir='./tmp/hf_cache',
         con=conn)
@@ -95,20 +115,6 @@ if __name__ == '__main__':
     ds = ds.filter(lambda e: e['label'] != None)
     logger.info(f'Removed examples within window, {len(ds)} datapoints remaining')
     logger.info(f'Initial dataset balance: {sum(ds["label"])/len(ds)}')
-
-    # data balance weighting
-    if params['balance']:
-        classes = [0,1]
-        class_weight = sklearn.utils.class_weight.compute_class_weight(
-            'balanced',
-            classes=classes,
-            y=ds['label']
-        )
-        class_weight = dict(zip(classes, class_weight))
-        logger.info(f"Weights for class balancing: {class_weight}")
-    else:
-        class_weight = None
-        logger.info(f"Not considering class balance during training.")
     
     # split the data
     splitter = data_utils.DataSplitter(ds)
@@ -117,6 +123,20 @@ if __name__ == '__main__':
     logger.info(f"Train balance: {sum(data_dict['train']['label'])/len(data_dict['train'])}")
     logger.info(f"Test balance: {sum(data_dict['test']['label'])/len(data_dict['test'])}")
     
+    # data balance weighting
+    if params['balance']:
+        classes = [0,1]
+        class_weight = sklearn.utils.class_weight.compute_class_weight(
+            'balanced',
+            classes=classes,
+            y=data_dict['train']['label']
+        )
+        class_weight = dict(zip(classes, class_weight))
+        logger.info(f"Weights for class balancing: {class_weight}")
+    else:
+        class_weight = None
+        logger.info(f"Not considering class balance during training.")
+
     # remove unnecessary columns
     data_dict = data_dict.map(lambda e: e, remove_columns=['protein_int_index', 'ogt', 'taxa_index', 'taxonomy'])
     logger.info(f'Final datasets: {data_dict}')
@@ -174,15 +194,15 @@ if __name__ == '__main__':
             optim='adamw_hf',
             optim_args=None,
             learning_rate=5e-5,
-            num_train_epochs=1,
+            num_train_epochs=5,
             per_device_train_batch_size=32,
             per_device_eval_batch_size=32,
             log_level='info',
             logging_strategy='steps',
             logging_steps=100,
             save_strategy='epoch',
-            evaluation_strategy='epoch',
-            eval_steps=None,
+            evaluation_strategy='steps',
+            eval_steps=1000,
             output_dir='./data/ogt_protein_classifier/model'
         )
         f1 = evaluate.load("f1")
@@ -191,7 +211,8 @@ if __name__ == '__main__':
             predictions = np.argmax(logits, axis=-1)
             return {'f1': f1.compute(predictions=predictions, references=labels)}
 
-        trainer = transformers.Trainer(
+        trainer = ImbalanceTrainer(
+            class_weights=class_weight,
             model=model,
             args=training_args,
             train_dataset=data_dict['train'],
