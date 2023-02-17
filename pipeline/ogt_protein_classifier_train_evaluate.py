@@ -22,6 +22,7 @@ import re
 
 from datasets import Dataset
 import transformers
+import torch
 import evaluate
 import sklearn.utils
 
@@ -45,6 +46,10 @@ if __name__ == '__main__':
     formatter = logging.Formatter('%(filename)-12s %(funcName)-12s: %(levelname)-8s %(message)s')
     fh.setFormatter(formatter)
     logger.addHandler(fh)
+
+    # get device
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    logger.info('Using device {device}')
 
     # load parameters
     with open("./params.yaml", "r") as stream:
@@ -125,6 +130,7 @@ if __name__ == '__main__':
         model = transformers.AutoModelForSequenceClassification.from_pretrained(
             "Rostlab/prot_bert"
         )
+        model.to(device)
         tokenizer = transformers.AutoTokenizer.from_pretrained("Rostlab/prot_bert")
         logger.info("Loaded ProtBERT model and tokenizer")
 
