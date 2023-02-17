@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     # get device
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    logger.info('Using device {device}')
+    logger.info(f'Using device {device}')
 
     # load parameters
     with open("./params.yaml", "r") as stream:
@@ -168,17 +168,22 @@ if __name__ == '__main__':
         
         # ready the train
         training_args = transformers.TrainingArguments(
+            do_train=True,
+            do_eval=True,
             label_names=['label'],
             optim='adamw_hf',
             optim_args=None,
             learning_rate=5e-5,
-            num_train_epochs=3,
-            per_device_train_batch_size=8,
-            per_device_eval_batch_size=8,
+            num_train_epochs=1,
+            per_device_train_batch_size=32,
+            per_device_eval_batch_size=32,
             log_level='info',
-            logging_strategy='epoch',
+            logging_strategy='steps',
+            logging_steps=100,
             save_strategy='epoch',
-            output_dir='./data/ogt_protein_classifier'
+            evaluation_strategy='epoch',
+            eval_steps=None,
+            output_dir='./data/ogt_protein_classifier/model'
         )
         f1 = evaluate.load("f1")
         def compute_metrics(eval_pred):
@@ -195,10 +200,13 @@ if __name__ == '__main__':
         )
         logger.info(f"Training parameters ready: {training_args}, beginning.")
         # run it!
-        trainer.train()
-        
+        training_results = trainer.train()
+        print(training_results)
+        print(trainer.state.log_history)
+
         # test it
-        trainer.evaluate()
+        eval_result = trainer.evaluate()
+        print(eval_result)
 
     else:
         raise NotImplementedError(f"Model type {params['model']} not available")

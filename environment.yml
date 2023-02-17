@@ -1,5 +1,7 @@
 name: learn2thermML
 channels:
+  - pytorch
+  - nvidia
   - conda-forge
   - defaults
 dependencies:
@@ -18,9 +20,11 @@ dependencies:
   - seaborn-base=0.12.0
   - scikit-learn
   - tensorflow=2.11.0
-  - pytorch=1.13.1
+  - pytorch
+  - pytorch-cuda=11.7
   - transformers=4.26.0
   - evaluate
+  - datasets
   - pip
   - pip:
     - duckdb==0.7.0
