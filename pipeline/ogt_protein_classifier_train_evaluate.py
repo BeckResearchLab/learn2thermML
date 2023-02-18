@@ -50,7 +50,7 @@ class ImbalanceTrainer(transformers.Trainer):
         # forward pass
         outputs = model(**inputs)
         logits = outputs.get("logits")
-        loss_fct = torch.nn.CrossEntropyLoss(weight=torch.tensor(list(self._class_weights.values())))
+        loss_fct = torch.nn.CrossEntropyLoss(weight=self._class_weights)
         loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
         return (loss, outputs) if return_outputs else loss
 
@@ -104,24 +104,24 @@ if __name__ == '__main__':
     high = params['ogt_window'][1]
     def get_label(example):
         if example['ogt']<=low:
-            example['label']=0
+            example['labels']=0
         elif example['ogt']>=high:
-            example['label']=1
+            example['labels']=1
         else:
-            example['label']=None
+            example['labels']=None
         return example
     ds = ds.map(get_label)
     logger.info('Labeled examples...')
-    ds = ds.filter(lambda e: e['label'] != None)
+    ds = ds.filter(lambda e: e['labels'] != None)
     logger.info(f'Removed examples within window, {len(ds)} datapoints remaining')
-    logger.info(f'Initial dataset balance: {sum(ds["label"])/len(ds)}')
+    logger.info(f'Initial dataset balance: {sum(ds["labels"])/len(ds)}')
     
     # split the data
     splitter = data_utils.DataSplitter(ds)
     data_dict = splitter.split(splittype=params['split_type'])
     logger.info(f"Split data into train and test")
-    logger.info(f"Train balance: {sum(data_dict['train']['label'])/len(data_dict['train'])}")
-    logger.info(f"Test balance: {sum(data_dict['test']['label'])/len(data_dict['test'])}")
+    logger.info(f"Train balance: {sum(data_dict['train']['labels'])/len(data_dict['train'])}")
+    logger.info(f"Test balance: {sum(data_dict['test']['labels'])/len(data_dict['test'])}")
     
     # data balance weighting
     if params['balance']:
@@ -129,9 +129,9 @@ if __name__ == '__main__':
         class_weight = sklearn.utils.class_weight.compute_class_weight(
             'balanced',
             classes=classes,
-            y=data_dict['train']['label']
+            y=data_dict['train']['labels']
         )
-        class_weight = dict(zip(classes, class_weight))
+        class_weight=torch.tensor(class_weight, dtype=torch.float).to(device)
         logger.info(f"Weights for class balancing: {class_weight}")
     else:
         class_weight = None
@@ -143,6 +143,9 @@ if __name__ == '__main__':
     data_dict.save_to_disk('./data/ogt_protein_classifier/data/')
     logger.info("Saved data to disk.")
     
+    # sending data
+    data_dict = data_dict.with_format("torch")
+ 
     # initialize the model
     if params['model'] == 'protbert':
         # load tokenizer and model
@@ -165,8 +168,8 @@ if __name__ == '__main__':
         def tokenizer_fn(examples):
             return tokenizer(examples["protein_seq"], max_length=512, padding="max_length", truncation=True)
         data_dict = data_dict.map(tokenizer_fn, batched=True)
-        logger.info('Tokenized dataset.')
-        print(data_dict)
+        data_dict = data_dict.map(lambda e: e, remove_columns=['protein_seq'])
+        logger.info(f'Tokenized dataset. {data_dict}')
 
         # fix the model if necessary
         if params['protocol'] == 'head':
@@ -190,11 +193,10 @@ if __name__ == '__main__':
         training_args = transformers.TrainingArguments(
             do_train=True,
             do_eval=True,
-            label_names=['label'],
             optim='adamw_hf',
             optim_args=None,
             learning_rate=5e-5,
-            num_train_epochs=5,
+            num_train_epochs=3,
             per_device_train_batch_size=32,
             per_device_eval_batch_size=32,
             log_level='info',
@@ -202,14 +204,21 @@ if __name__ == '__main__':
             logging_steps=100,
             save_strategy='epoch',
             evaluation_strategy='steps',
-            eval_steps=1000,
+            eval_steps=100,
             output_dir='./data/ogt_protein_classifier/model'
         )
-        f1 = evaluate.load("f1")
         def compute_metrics(eval_pred):
+            f1=evaluate.load('f1')
+            acc=evaluate.load('accuracy')
+            matt=evaluate.load('matthews_correlation')
+
             logits, labels = eval_pred
             predictions = np.argmax(logits, axis=-1)
-            return {'f1': f1.compute(predictions=predictions, references=labels)}
+            f1_val = f1.compute(predictions=predictions, references=labels)['f1']
+            acc_val = acc.compute(predictions=predictions, references=labels)['accuracy']
+            matt_val = matt.compute(predictions=predictions, references=labels)['matthews_correlation']
+
+            return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val}
 
         trainer = ImbalanceTrainer(
             class_weights=class_weight,
@@ -220,6 +229,7 @@ if __name__ == '__main__':
             compute_metrics=compute_metrics,
         )
         logger.info(f"Training parameters ready: {training_args}, beginning.")
+        
         # run it!
         training_results = trainer.train()
         print(training_results)
