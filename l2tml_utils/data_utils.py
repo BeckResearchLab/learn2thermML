@@ -78,3 +78,23 @@ class DataSplitter:
         return DatasetDict({'train':train, 'test':test})
 
 
+def get_balance_data_sizes(n_class_a: int, n_class_b: int, desired_balance: float=0.5, upsample_frac: float=0.0):
+    """Determine training final class data sizes to meet a desired
+    
+    We have some difference in number of data between the majority class. 
+    a is the number of minority class, b is the number of majority class, so b-a is the difference in class sizes.
+
+    The original data balance is Bi=a/(a+b). To fix the balancing problem we can upsample u data points from the minority class,
+    and downsample d examples from the majority. To achieve the desired balance Bf:
+
+    Bf = a+u/(a+u+b-d)
+
+    The desired fraction of upsampleing should be specified:
+    Fu = u/(u+d)
+
+    Thus the final amounts can be specified:
+
+
+
+    """
+    return None
