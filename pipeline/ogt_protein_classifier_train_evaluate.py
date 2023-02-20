@@ -252,6 +252,7 @@ if __name__ == '__main__':
         # compute the saving and evaluation timeframe
         n_steps_per_epoch = int(len(data_dict['train']) / params['batch_size'])
         n_steps_per_save = int(n_steps_per_epoch/params['n_save_per_epoch'])
+        logger.info(f"Saving/evaluating every {n_steps_per_save} batches of size {params['batch_size']}")
 
         # ready the train
         training_args = transformers.TrainingArguments(
