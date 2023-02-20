@@ -197,15 +197,16 @@ if __name__ == '__main__':
             optim_args=None,
             learning_rate=5e-5,
             num_train_epochs=3,
-            per_device_train_batch_size=32,
+            per_device_train_batch_size=1000,
             per_device_eval_batch_size=32,
             log_level='info',
             logging_strategy='steps',
             logging_steps=100,
-            save_strategy='epoch',
+            save_strategy='steps',
             evaluation_strategy='steps',
             eval_steps=100,
-            output_dir='./data/ogt_protein_classifier/model'
+            output_dir='./data/ogt_protein_classifier/model',
+            load_best_model_at_end=True
         )
         def compute_metrics(eval_pred):
             f1=evaluate.load('f1')
@@ -232,14 +233,23 @@ if __name__ == '__main__':
         
         # run it!
         training_results = trainer.train()
-        print(training_results)
-        print(trainer.state.log_history)
+        logger.info(f"Training results: {training_results}")
 
         # test it
         eval_result = trainer.evaluate()
-        print(eval_result)
+        logger.info(f"Evaluation results: {eval_results}")
+
+        # add other metrics
+        metrics=dict(eval_result)
+        callback = trainer.pop_callback(transformers.integrations.CodeCarbonCallback)
+        emissions=callback.final_emissions
+        metrics['emissions'] = emissions
+
 
     else:
         raise NotImplementedError(f"Model type {params['model']} not available")
         
     
+    # save metrics
+    with open('./data/ogt_protein_classifier/metrics.yaml', "w") as stream:
+        yaml_dump(metrics, stream)
