@@ -245,6 +245,8 @@ if __name__ == '__main__':
         emissions=callback.final_emissions
         metrics['emissions'] = emissions
 
+        with open('./data/ogt_protein_classifier/metrics.yaml', "w") as stream:
+                yaml_dump(metrics, stream)
 
     else:
         raise NotImplementedError(f"Model type {params['model']} not available")
