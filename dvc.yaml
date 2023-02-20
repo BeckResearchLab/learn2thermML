@@ -5,12 +5,17 @@ stages:
     - ./pipeline/ogt_protein_classifier_train_evaluate.py
     - ./data/database
     outs:
-    - ./data/models/ogt_cfr
+    - ./data/ogt_protein_classifier/data
+    - ./data/ogt_protein_classifier/model
     params:
     - ogt_protein_classifier_train_evaluate.split_type
     - ogt_protein_classifier_train_evaluate.ogt_window
-    - ogt_protein_classifier_train_evaluate.balance
+    - ogt_protein_classifier_train_evaluate.min_balance
     - ogt_protein_classifier_train_evaluate.model
     - ogt_protein_classifier_train_evaluate.protocol
+    - ogt_protein_classifier_train_evaluate.batch_size
+    - ogt_protein_classifier_train_evaluate.epochs
+    - ogt_protein_classifier_train_evaluate.n_save_per_epoch
+    - ogt_protein_classifier_train_evaluate.dropout
     metrics:
-    - ./data/metrics/ogt_protein_classifier_train_evaluate.yaml
+    - ./data/ogt_protein_classifier/metrics.yaml

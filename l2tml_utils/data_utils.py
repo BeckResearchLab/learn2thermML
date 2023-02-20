@@ -38,7 +38,7 @@ class DataSplitter:
         splitting_col: str=None
     ):
         if splittype == 'random':
-            logger.info('Splitting dataset randomly with test frac {frac}')
+            logger.info(f'Splitting dataset randomly with test frac {frac}')
             return self.dataset.train_test_split(test_size=frac)
         elif type(splittype) == int:
             raise NotImplemented(
@@ -140,9 +140,9 @@ def get_balance_data_sizes(n_class_a: int, n_class_b: int, desired_balance: floa
     else:
         u = u_tmp
         d = int(u + min_size + maj_size - (min_size + u)/desired_balance)
-    
+
     # return final sizes
-    logger.info(f"Suggesting upsampling minority class by {u} and downsampling majority class by {d}")
+    logger.info(f"Suggesting upsampling minority class by {u} and downsampling majority class by {d} to meet balance of {desired_balance}")
     min_size_final = min_size + u
     maj_size_final = maj_size - d
     if maj_class == 'b':

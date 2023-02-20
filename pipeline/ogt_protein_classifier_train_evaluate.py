@@ -8,7 +8,7 @@ Parameters:
 - `ogt_window`: (float, float), low and high temparature of window between OGT classes
 - `min_balance`: float or None, minimum balance of classes. class weighted training is always used, but this can be used to speicify downsampling of the 
     majority class in order to meet a minimum imbalance
-- `upsample_frac`: float, fraction of data balancing that will be conducted by upsampling the minority class, the rest is downsampling
+- `max_upsampling`: float, maximum fraction of original minority class to insert into the dataset
     ignored if `min_balance` is None
 - `model`: 'protbert' or 'DeepTP', which model to start with
 - `protocol`: 'head' or 'finetune'
@@ -33,7 +33,7 @@ import torch
 import evaluate
 import sklearn.utils
 
-import data_utils
+import l2tml_utils.data_utils as data_utils
 
 import logging
 
@@ -63,7 +63,7 @@ class ImbalanceTrainer(transformers.Trainer):
 
 if __name__ == '__main__':
     # start logger
-    logger = logging.getLogger(LOGNAME)
+    logger = logging.getLogger()
     logger.setLevel(getattr(logging, LOGLEVEL))
     fh = logging.FileHandler(LOGFILE, mode='w')
     formatter = logging.Formatter('%(filename)-12s %(funcName)-12s: %(levelname)-8s %(message)s')
@@ -85,6 +85,11 @@ if __name__ == '__main__':
 
     # get the data
     conn = ddb.connect("./data/database")
+    # create indexes first
+    conn.execute("CREATE UNIQUE INDEX taxa_index ON taxa (taxa_index)")
+    conn.commit()
+    conn.execute("CREATE INDEX taxa_index_foreign ON proteins (taxa_index)")
+    conn.commit()
     ds = datasets.Dataset.from_sql(
         """SELECT 
             proteins.protein_int_index,
@@ -101,6 +106,7 @@ if __name__ == '__main__':
         cache_dir='./tmp/hf_cache',
         con=conn)
     logger.info(f"Loaded data from database, {len(ds)} total points")
+    conn.close()
 
     # remove no OGT label
     ds = ds.filter(lambda e: e['ogt'] != None)
@@ -138,15 +144,37 @@ if __name__ == '__main__':
         data_dict['positive'] = data_dict['positive'].shuffle()
         data_dict['negative'] = data_dict['train'].filter(lambda e: e['labels']==0)
         data_dict['negative'] = data_dict['negative'].shuffle()
-        # which class is the majority?
-        majority_class = 'positive' if len(data_dict['positive']) > len(data_dict['negative']) else 'negative' 
-        minority_class = 'positive' if majority_class == 'negative' else 'negative'
-        # what is the difference in data size?
-        imbalance_size = len(data_dict[majority_class]) - len(data_dict[minority_class])
-        n_upsample = int(imbalance_size*params['upsample_frac'])
-        n_downsample = imbalance_size - n_upsample
-        logger.info(f"Conducting balancing for training data with {len(data_dict['positive'])} postiive and {data_dict['negative']} negative. Majority: {majority_class}")
-        logger.info(f"Data size difference: {imbalance_size}. Removing {} from majority and upsampling {} from minority")
+        # get the suggested class data sizes
+        logger.info(f"Conducting balancing for training data with {len(data_dict['positive'])} positive and {len(data_dict['negative'])} negative.")
+        n_negative, n_positive = data_utils.get_balance_data_sizes(
+            len(data_dict['negative']),
+            len(data_dict['positive']),
+            desired_balance=params['min_balance'],
+            max_upsampling=params['max_upsampling'])
+
+        # actualy sample it
+        desired_balance_dict = {'negative': n_negative, 'positive': n_positive}
+        for class_, n_class in desired_balance_dict.items():
+            if n_class < len(data_dict[class_]):
+                # we can just select the first n since its already shuffled for downsampling
+                data_dict[class_] = data_dict[class_].select(range(n_negative))
+            elif n_class > len(data_dict[class_]):
+                # sample with replacement to upsample
+                indexes = np.random.randint(0, len(data_dict[class_]), size=n_class)
+                data_dict[class_] = data_dict[class_].select(indexes)
+            else:
+                pass
+        logger.info(f"Final negative, positive class training sizes: {len(data_dict['negative'])}, {len(data_dict['positive'])}")
+        # stick the data back together
+        data_dict['train'] = datasets.concatenate_datasets([data_dict['positive'], data_dict['negative']]).shuffle()
+        # drop the datasets from processing
+        _ = data_dict.pop('positive')
+        _.cleanup_cache_files()
+        del(_)
+        _ = data_dict.pop('negative')
+        _.cleanup_cache_files()
+        del(_)
+
         
     # class weighting for imbalance
     classes = [0,1]
@@ -161,6 +189,7 @@ if __name__ == '__main__':
     # remove unnecessary columns
     data_dict = data_dict.map(lambda e: e, remove_columns=['protein_int_index', 'ogt', 'taxa_index', 'taxonomy'])
     logger.info(f'Final datasets: {data_dict}')
+    data_dict.cleanup_cache_files()
     data_dict.save_to_disk('./data/ogt_protein_classifier/data/')
     logger.info("Saved data to disk.")
     
@@ -171,10 +200,20 @@ if __name__ == '__main__':
     if params['model'] == 'protbert':
         # load tokenizer and model
         # https://huggingface.co/Rostlab/prot_bert
+        config = transformers.BertConfig.from_pretrained("Rostlab/prot_bert")
+        
+        # set hyperparam changes to config
+        config.classifier_dropout = params['dropout']
+        config.hidden_dropout_prob = params['dropout']
+        config.attention_probs_dropout_prob = params['dropout']
+
+        # load model
         model = transformers.AutoModelForSequenceClassification.from_pretrained(
-            "Rostlab/prot_bert"
+            "Rostlab/prot_bert", config=config
         )
         model.to(device)
+
+        # and tokenizer
         tokenizer = transformers.AutoTokenizer.from_pretrained("Rostlab/prot_bert")
         logger.info("Loaded ProtBERT model and tokenizer")
 
@@ -210,6 +249,10 @@ if __name__ == '__main__':
                 trainable_params += num
         logger.info(f'{total_params} total params, {trainable_params} trainable.')
         
+        # compute the saving and evaluation timeframe
+        n_steps_per_epoch = int(len(data_dict['train']) / params['batch_size'])
+        n_steps_per_save = int(n_steps_per_epoch/params['n_save_per_epoch'])
+
         # ready the train
         training_args = transformers.TrainingArguments(
             do_train=True,
@@ -217,9 +260,9 @@ if __name__ == '__main__':
             optim='adamw_hf',
             optim_args=None,
             learning_rate=5e-5,
-            num_train_epochs=3,
-            per_device_train_batch_size=300,
-            per_device_eval_batch_size=32,
+            num_train_epochs=params['epochs'],
+            per_device_train_batch_size=params['batch_size'],
+            per_device_eval_batch_size=params['batch_size'],
             log_level='info',
             logging_strategy='steps',
             logging_steps=1,
@@ -263,11 +306,8 @@ if __name__ == '__main__':
         # add other metrics
         metrics=dict(eval_result)
         callback = trainer.pop_callback(transformers.integrations.CodeCarbonCallback)
-        emissions=callback.final_emissions
+        emissions=callback.tracker.final_emissions
         metrics['emissions'] = emissions
-
-        with open('./data/ogt_protein_classifier/metrics.yaml', "w") as stream:
-                yaml_dump(metrics, stream)
 
     else:
         raise NotImplementedError(f"Model type {params['model']} not available")
