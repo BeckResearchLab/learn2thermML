@@ -218,14 +218,14 @@ if __name__ == '__main__':
             optim_args=None,
             learning_rate=5e-5,
             num_train_epochs=3,
-            per_device_train_batch_size=1000,
+            per_device_train_batch_size=300,
             per_device_eval_batch_size=32,
             log_level='info',
             logging_strategy='steps',
-            logging_steps=100,
+            logging_steps=1,
             save_strategy='steps',
             evaluation_strategy='steps',
-            eval_steps=100,
+            eval_steps=5,
             output_dir='./data/ogt_protein_classifier/model',
             load_best_model_at_end=True
         )
@@ -258,7 +258,7 @@ if __name__ == '__main__':
 
         # test it
         eval_result = trainer.evaluate()
-        logger.info(f"Evaluation results: {eval_results}")
+        logger.info(f"Evaluation results: {eval_result}")
 
         # add other metrics
         metrics=dict(eval_result)
