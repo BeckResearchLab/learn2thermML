@@ -78,7 +78,7 @@ class DataSplitter:
         return DatasetDict({'train':train, 'test':test})
 
 
-def get_balance_data_sizes(n_class_a: int, n_class_b: int, desired_balance: float=0.5, upsample_frac: float=0.0):
+def get_balance_data_sizes(n_class_a: int, n_class_b: int, desired_balance: float=0.5, max_upsampling: float=0.0):
     """Determine training final class data sizes to meet a desired
     
     We have some difference in number of data between the majority class. 
@@ -89,12 +89,64 @@ def get_balance_data_sizes(n_class_a: int, n_class_b: int, desired_balance: floa
 
     Bf = a+u/(a+u+b-d)
 
-    The desired fraction of upsampleing should be specified:
-    Fu = u/(u+d)
+    The desired maximum fraction of upsampleing should be specified:
+    u/a <= Fu
 
-    Thus the final amounts can be specified:
+    The remaining portion to achieve Bf is done by downsampling.
 
+    Parameters
+    ----------
+    n_class_a : int
+        Original size of class a
+    n_class_b : int
+        Original size of class b
+    desired_balance : float, default 0.5
+        Final data balance between classes, must be > 0.0 and <= 0.5
+    max_upsampling : float, default 0.0
+        Fraction of original minority class to supsample. 0.0 means none, 1.0 means final size 200% original size
 
-
+    Returns
+    -------
+    int, int : final data sizes to class a and b
     """
-    return None
+    # check for valid input
+    if desired_balance > 0.5 or desired_balance <= 0.0:
+        raise ValueError("desired_balance must be between 0.0 and 0.5")
+
+    # determinine the majority
+    if n_class_b > n_class_a:
+        maj_class = 'b'
+        maj_size = n_class_b
+        min_size = n_class_a
+    elif n_class_b < n_class_a:
+        maj_class = 'a'
+        maj_size = n_class_a
+        min_size = n_class_b
+    else:
+        logger.info("Dataset already perfectly balanced, making no change.")
+        return n_class_a, n_class_b
+
+    # check that the data has not already met the criteria 
+    if min_size/(min_size + maj_size) >= desired_balance:
+        logger.info(f"Asked for minimum balance of {desired_balance}, but the data is already  more balanced: {min_size/(min_size + maj_size)}, making no change.")
+        return n_class_a, n_class_b
+
+    # Compute amount to upsample
+    # determine if the max upsampling will put us over the desired balance
+    u_tmp = int(max_upsampling * min_size) # assuming we do the maximum amount of upsampling
+    if ((min_size + u_tmp) / (min_size + u_tmp + maj_size)) > desired_balance:
+        u = int((desired_balance * (min_size + maj_size) - min_size)/(1-desired_balance))
+        d = 0
+    else:
+        u = u_tmp
+        d = int(u + min_size + maj_size - (min_size + u)/desired_balance)
+    
+    # return final sizes
+    logger.info(f"Suggesting upsampling minority class by {u} and downsampling majority class by {d}")
+    min_size_final = min_size + u
+    maj_size_final = maj_size - d
+    if maj_class == 'b':
+        return min_size_final, maj_size_final
+    else:
+        return maj_size_final, min_size_final
+
