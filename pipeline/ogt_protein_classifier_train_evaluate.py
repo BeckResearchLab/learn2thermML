@@ -6,11 +6,18 @@ Parameters:
   - taxa_id: keeps proteins from a particular organism together
   - int: clusters taxa by taxonomy of a particular level, 1 is kingdom, 2 is phylum, etc. Note that this may have errors, as it is based on taxonomy specified in NCBI which sometimes has ambiquity
 - `ogt_window`: (float, float), low and high temparature of window between OGT classes
-- `balance`: bool, whether or not to balance training set
+- `min_balance`: float or None, minimum balance of classes. class weighted training is always used, but this can be used to speicify downsampling of the 
+    majority class in order to meet a minimum imbalance
+- `upsample_frac`: float, fraction of data balancing that will be conducted by upsampling the minority class, the rest is downsampling
+    ignored if `min_balance` is None
 - `model`: 'protbert' or 'DeepTP', which model to start with
 - `protocol`: 'head' or 'finetune'
   - head: will only train a MLP head to the base model
   - finetune: allows predictor head and base model to be backpropegated
+- `batch_size`: int, batch size for training and evaluation
+- `epochs`: int, total epochs to train, best model is reloaded at the end
+- `n_save_per_epoch`: int, number of times to evaluate and save model per training epoch. 1 is once at the end of the epoch.
+
 """
 import os
 from yaml import safe_load as yaml_load
@@ -119,23 +126,37 @@ if __name__ == '__main__':
     # split the data
     splitter = data_utils.DataSplitter(ds)
     data_dict = splitter.split(splittype=params['split_type'])
+    data_dict = data_dict.shuffle()
     logger.info(f"Split data into train and test")
     logger.info(f"Train balance: {sum(data_dict['train']['labels'])/len(data_dict['train'])}")
     logger.info(f"Test balance: {sum(data_dict['test']['labels'])/len(data_dict['test'])}")
     
-    # data balance weighting
-    if params['balance']:
-        classes = [0,1]
-        class_weight = sklearn.utils.class_weight.compute_class_weight(
-            'balanced',
-            classes=classes,
-            y=data_dict['train']['labels']
-        )
-        class_weight=torch.tensor(class_weight, dtype=torch.float).to(device)
-        logger.info(f"Weights for class balancing: {class_weight}")
-    else:
-        class_weight = None
-        logger.info(f"Not considering class balance during training.")
+    # class balancing
+    if params['min_balance'] is not None:
+        # split the train into positive and negative
+        data_dict['positive'] = data_dict['train'].filter(lambda e: e['labels']==1)
+        data_dict['positive'] = data_dict['positive'].shuffle()
+        data_dict['negative'] = data_dict['train'].filter(lambda e: e['labels']==0)
+        data_dict['negative'] = data_dict['negative'].shuffle()
+        # which class is the majority?
+        majority_class = 'positive' if len(data_dict['positive']) > len(data_dict['negative']) else 'negative' 
+        minority_class = 'positive' if majority_class == 'negative' else 'negative'
+        # what is the difference in data size?
+        imbalance_size = len(data_dict[majority_class]) - len(data_dict[minority_class])
+        n_upsample = int(imbalance_size*params['upsample_frac'])
+        n_downsample = imbalance_size - n_upsample
+        logger.info(f"Conducting balancing for training data with {len(data_dict['positive'])} postiive and {data_dict['negative']} negative. Majority: {majority_class}")
+        logger.info(f"Data size difference: {imbalance_size}. Removing {} from majority and upsampling {} from minority")
+        
+    # class weighting for imbalance
+    classes = [0,1]
+    class_weight = sklearn.utils.class_weight.compute_class_weight(
+        'balanced',
+        classes=classes,
+        y=data_dict['train']['labels']
+    )
+    class_weight=torch.tensor(class_weight, dtype=torch.float).to(device)
+    logger.info(f"Weights for class balancing: {class_weight}")
 
     # remove unnecessary columns
     data_dict = data_dict.map(lambda e: e, remove_columns=['protein_int_index', 'ogt', 'taxa_index', 'taxonomy'])
