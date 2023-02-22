@@ -198,6 +198,7 @@ if __name__ == '__main__':
     # cut training data to a single batch to check if we can overfit
     if params["dev_overtrain_one_batch"]:
         data_dict['train'] = data_dict['train'].select(range(params['batch_size']))
+        logger.info(f"Overfitting test on a single example...")
     ########################################
 
     # class weighting for imbalance
@@ -259,7 +260,7 @@ if __name__ == '__main__':
         def tokenizer_fn(examples):
             return tokenizer(examples["protein_seq"], max_length=512, padding="max_length", truncation=True)
         data_dict = data_dict.map(tokenizer_fn, batched=True)
-        data_dict = data_dict.map(lambda e: e, remove_columns=['protein_seq'])
+        data_dict = data_dict.remove_columns('protein_seq')
         logger.info(f'Tokenized dataset. {data_dict}')
         
         # get data processing emissions
@@ -285,7 +286,12 @@ if __name__ == '__main__':
         
         # compute the saving and evaluation timeframe
         n_steps_per_epoch = int(len(data_dict['train']) / params['batch_size'])
-        n_steps_per_save = int(n_steps_per_epoch/params['n_save_per_epoch'])
+        if params['n_save_per_epoch'] == 0:
+            n_steps_per_save = None
+            save_strategy = 'no'
+        else:
+            save_strategy = 'steps'
+            n_steps_per_save = int(n_steps_per_epoch/params['n_save_per_epoch'])
         logger.info(f"Saving/evaluating every {n_steps_per_save} batches of size {params['batch_size']}")
 
         # ready the train
@@ -301,9 +307,9 @@ if __name__ == '__main__':
             log_level='info',
             logging_strategy='steps',
             logging_steps=1,
-            save_strategy='steps',
+            save_strategy=save_strategy,
             save_steps=n_steps_per_save,
-            evaluation_strategy='steps',
+            evaluation_strategy=save_strategy,
             eval_steps=n_steps_per_save,
             output_dir='./data/ogt_protein_classifier/model',
             load_best_model_at_end=True
