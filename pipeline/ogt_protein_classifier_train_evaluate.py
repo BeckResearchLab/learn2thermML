@@ -223,7 +223,7 @@ if __name__ == '__main__':
 
         # load model
         model = transformers.AutoModelForSequenceClassification.from_pretrained(
-            "Rostlab/prot_bert", config=config
+            "Rostlab/prot_bert", config=config, num_labels=3
         )
         model.to(device)
 
