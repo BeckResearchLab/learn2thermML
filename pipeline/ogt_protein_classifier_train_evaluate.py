@@ -73,6 +73,9 @@ if __name__ == '__main__':
     transformers_logger = logging.getLogger('transformers')
     transformers_logger.setLevel(getattr(logging, LOGLEVEL))
     transformers_logger.addHandler(fh)
+    utils_logger = logging.getLogger('l2tml_utils')
+    utils_logger.setLevel(getattr(logging, LOGLEVEL))
+    utils_logger.addHandler(fh)
     # datasets.utils.logging.set_verbosity('WARNING')
     # transformers.utils.logging.set_verbosity(LOGLEVEL)
     
@@ -218,7 +221,7 @@ if __name__ == '__main__':
         config = transformers.BertConfig.from_pretrained("Rostlab/prot_bert")
         
         # set hyperparam changes to config
-        config.num_labels=3
+        config.num_labels=2
         config.classifier_dropout = params['dropout']
         # huggingface trainer sets the whole model to .train() each training step,
         # so we cannot just use .eval() on the model now to turn of bert dropout for a head only model
@@ -234,7 +237,6 @@ if __name__ == '__main__':
         model = transformers.AutoModelForSequenceClassification.from_pretrained(
             "Rostlab/prot_bert", config=config
         )
-        model.to(device)
 
         # and tokenizer
         tokenizer = transformers.AutoTokenizer.from_pretrained("Rostlab/prot_bert")
@@ -312,7 +314,10 @@ if __name__ == '__main__':
             matt_val = matt.compute(predictions=predictions, references=labels)['matthews_correlation']
 
             return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val}
-
+        
+        # send model to device and go
+        model.to(device)
+        logger.info(f"Model ready for training: {model}")
         trainer = ImbalanceTrainer(
             class_weights=class_weight,
             model=model,
