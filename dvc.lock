@@ -12,7 +12,7 @@ stages:
     params:
       params.yaml:
         ogt_protein_classifier_train_evaluate.batch_size: 100
-        ogt_protein_classifier_train_evaluate.dropout: 0.2
+        ogt_protein_classifier_train_evaluate.dropout: 0.0
         ogt_protein_classifier_train_evaluate.epochs: 100
         ogt_protein_classifier_train_evaluate.min_balance: 0.5
         ogt_protein_classifier_train_evaluate.model: protbert
@@ -24,13 +24,13 @@ stages:
         ogt_protein_classifier_train_evaluate.split_type: random
     outs:
     - path: ./data/ogt_protein_classifier/data
-      md5: dadfb0a2b552b72b1122e25c7949a218.dir
-      size: 550601
+      md5: a2e02cf6c14f24a0ae133414b0051a53.dir
+      size: 550913
       nfiles: 7
     - path: ./data/ogt_protein_classifier/metrics.yaml
-      md5: ca2eb4d80268a017bf09be7db9c0d370
+      md5: 4b0cd4054b96b0b0b59409e672bfa13d
       size: 287
     - path: ./data/ogt_protein_classifier/model
-      md5: faee4f356c379eb33b4a37d32725f24c.dir
-      size: 26918
+      md5: 5e6e34f06751d396513d72f7cf0943f2.dir
+      size: 26929
       nfiles: 4
