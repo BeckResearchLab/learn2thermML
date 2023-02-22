@@ -119,7 +119,7 @@ if __name__ == '__main__':
         INNER JOIN taxa ON (proteins.taxa_index=taxa.taxa_index)
         WHERE proteins.protein_len<250
         AND taxa.ogt IS NOT NULL
-        USING SAMPLE 5000""",
+        USING SAMPLE 25000""",
         config_name='test',
         cache_dir='./tmp/hf_cache',
         con=conn)
