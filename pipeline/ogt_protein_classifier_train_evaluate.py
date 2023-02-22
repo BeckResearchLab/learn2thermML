@@ -37,6 +37,7 @@ import codecarbon
 import l2tml_utils.data_utils as data_utils
 
 import logging
+logger = logging.getLogger(__name__)
 
 if 'LOGLEVEL' in os.environ:
     LOGLEVEL = os.environ['LOGLEVEL']
@@ -64,16 +65,16 @@ class ImbalanceTrainer(transformers.Trainer):
 
 if __name__ == '__main__':
     # start logger
-    logger = logging.getLogger()
     logger.setLevel(getattr(logging, LOGLEVEL))
     fh = logging.FileHandler(LOGFILE, mode='w')
     formatter = logging.Formatter('%(filename)-12s %(asctime)s;%(funcName)-12s: %(levelname)-8s %(message)s')
     fh.setFormatter(formatter)
     logger.addHandler(fh)
-    datasets.utils.logging.set_verbosity(LOGLEVEL)
-    transformers.utils.logging.set_verbosity(LOGLEVEL)
-    transformers.utils.logging.enable_default_handler()
-    transformers.utils.logging.enable_explicit_format()
+    transformers_logger = logging.getLogger('transformers')
+    transformers_logger.setLevel(getattr(logging, LOGLEVEL))
+    transformers_logger.addHandler(fh)
+    # datasets.utils.logging.set_verbosity('WARNING')
+    # transformers.utils.logging.set_verbosity(LOGLEVEL)
     
     # create dirs
     if not os.path.exists('./data/ogt_protein_classifier/model'):
@@ -115,7 +116,7 @@ if __name__ == '__main__':
         INNER JOIN taxa ON (proteins.taxa_index=taxa.taxa_index)
         WHERE proteins.protein_len<250
         AND taxa.ogt IS NOT NULL
-        USING SAMPLE 100000""",
+        USING SAMPLE 5000""",
         config_name='test',
         cache_dir='./tmp/hf_cache',
         con=conn)
@@ -217,13 +218,21 @@ if __name__ == '__main__':
         config = transformers.BertConfig.from_pretrained("Rostlab/prot_bert")
         
         # set hyperparam changes to config
+        config.num_labels=3
         config.classifier_dropout = params['dropout']
-        config.hidden_dropout_prob = params['dropout']
-        config.attention_probs_dropout_prob = params['dropout']
+        # huggingface trainer sets the whole model to .train() each training step,
+        # so we cannot just use .eval() on the model now to turn of bert dropout for a head only model
+        # instead manualyl set bert dropout to 0 for a head model.
+        if not params['protocol'] == 'head':
+            config.hidden_dropout_prob = params['dropout']
+            config.attention_probs_dropout_prob = params['dropout']
+        else:
+            config.hidden_dropout_prob = 0.0
+            config.attention_probs_dropout_prob = 0.0
 
         # load model
         model = transformers.AutoModelForSequenceClassification.from_pretrained(
-            "Rostlab/prot_bert", config=config, num_labels=3
+            "Rostlab/prot_bert", config=config
         )
         model.to(device)
 
