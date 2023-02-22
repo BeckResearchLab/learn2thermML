@@ -193,7 +193,13 @@ if __name__ == '__main__':
         _.cleanup_cache_files()
         del(_)
 
-        
+    # DEV OPTION IGNORE FOR NORMAL OPERATION
+    ########################################
+    # cut training data to a single batch to check if we can overfit
+    if params["dev_overtrain_one_batch"]:
+        data_dict['train'] = data_dict['train'].select(range(params['batch_size']))
+    ########################################
+
     # class weighting for imbalance
     classes = [0,1]
     class_weight = sklearn.utils.class_weight.compute_class_weight(
@@ -221,7 +227,7 @@ if __name__ == '__main__':
         config = transformers.BertConfig.from_pretrained("Rostlab/prot_bert")
         
         # set hyperparam changes to config
-        config.num_labels=2
+        config.num_labels = 2
         config.classifier_dropout = params['dropout']
         # huggingface trainer sets the whole model to .train() each training step,
         # so we cannot just use .eval() on the model now to turn of bert dropout for a head only model

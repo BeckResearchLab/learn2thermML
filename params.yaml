@@ -7,6 +7,6 @@ ogt_protein_classifier_train_evaluate:
   protocol: 'head'
   dropout: 0.2
   batch_size: 100
-  epochs: 5
+  epochs: 2
   n_save_per_epoch: 2
-
+  dev_overtrain_one_batch: false
