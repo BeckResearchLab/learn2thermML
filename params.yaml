@@ -1,12 +1,12 @@
 ogt_protein_classifier_train_evaluate:
-  split_type: 'taxa_id'
-  ogt_window: [40.0, 60.0]
-  min_balance: 0.25
-  max_upsampling: 10.0
+  split_type: 'random'
+  ogt_window: [35.0, 60.0]
+  min_balance: 0.5
+  max_upsampling: 0.0
   model: 'protbert'
   protocol: 'head'
   dropout: 0.2
   batch_size: 100
-  epochs: 3
-  n_save_per_epoch: 5
+  epochs: 5
+  n_save_per_epoch: 2
 

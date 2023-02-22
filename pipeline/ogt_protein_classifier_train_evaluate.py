@@ -32,6 +32,7 @@ import transformers
 import torch
 import evaluate
 import sklearn.utils
+import codecarbon
 
 import l2tml_utils.data_utils as data_utils
 
@@ -66,13 +67,19 @@ if __name__ == '__main__':
     logger = logging.getLogger()
     logger.setLevel(getattr(logging, LOGLEVEL))
     fh = logging.FileHandler(LOGFILE, mode='w')
-    formatter = logging.Formatter('%(filename)-12s %(funcName)-12s: %(levelname)-8s %(message)s')
+    formatter = logging.Formatter('%(filename)-12s %(asctime)s;%(funcName)-12s: %(levelname)-8s %(message)s')
     fh.setFormatter(formatter)
     logger.addHandler(fh)
     datasets.utils.logging.set_verbosity(LOGLEVEL)
     transformers.utils.logging.set_verbosity(LOGLEVEL)
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
+    
+    # create dirs
+    if not os.path.exists('./data/ogt_protein_classifier/model'):
+        os.mkdir('./data/ogt_protein_classifier/model')
+    if not os.path.exists('./data/ogt_protein_classifier/data'):
+        os.mkdir('./data/ogt_protein_classifier/data')
 
     # get device
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -82,6 +89,13 @@ if __name__ == '__main__':
     with open("./params.yaml", "r") as stream:
         params = yaml_load(stream)['ogt_protein_classifier_train_evaluate']
     logger.info(f"Loaded parameters: {params}")
+    
+    # start carbon tracker for data processing
+    data_tracker = codecarbon.EmissionsTracker( 
+        project_name="data_process",
+        output_dir="./data/ogt_protein_classifier/model",
+    )
+    data_tracker.start()
 
     # get the data
     conn = ddb.connect("./data/database")
@@ -101,7 +115,7 @@ if __name__ == '__main__':
         INNER JOIN taxa ON (proteins.taxa_index=taxa.taxa_index)
         WHERE proteins.protein_len<250
         AND taxa.ogt IS NOT NULL
-        USING SAMPLE 5000""",
+        USING SAMPLE 100000""",
         config_name='test',
         cache_dir='./tmp/hf_cache',
         con=conn)
@@ -215,7 +229,7 @@ if __name__ == '__main__':
 
         # and tokenizer
         tokenizer = transformers.AutoTokenizer.from_pretrained("Rostlab/prot_bert")
-        logger.info("Loaded ProtBERT model and tokenizer")
+        logger.info(f"Loaded ProtBERT model and tokenizer. Model config: {model.config}")
 
         # tokenize the data
         def prepare_aa_seq(example):
@@ -230,6 +244,9 @@ if __name__ == '__main__':
         data_dict = data_dict.map(tokenizer_fn, batched=True)
         data_dict = data_dict.map(lambda e: e, remove_columns=['protein_seq'])
         logger.info(f'Tokenized dataset. {data_dict}')
+        
+        # get data processing emissions
+        data_emissions = data_tracker.stop()
 
         # fix the model if necessary
         if params['protocol'] == 'head':
@@ -268,8 +285,9 @@ if __name__ == '__main__':
             logging_strategy='steps',
             logging_steps=1,
             save_strategy='steps',
+            save_steps=n_steps_per_save,
             evaluation_strategy='steps',
-            eval_steps=5,
+            eval_steps=n_steps_per_save,
             output_dir='./data/ogt_protein_classifier/model',
             load_best_model_at_end=True
         )
@@ -308,12 +326,12 @@ if __name__ == '__main__':
         metrics=dict(eval_result)
         callback = trainer.pop_callback(transformers.integrations.CodeCarbonCallback)
         emissions=callback.tracker.final_emissions
-        metrics['emissions'] = emissions
+        metrics['model_emissions'] = emissions
+        metrics['data_emissions'] = data_emissions
 
     else:
         raise NotImplementedError(f"Model type {params['model']} not available")
-        
-    
+
     # save metrics
     with open('./data/ogt_protein_classifier/metrics.yaml', "w") as stream:
         yaml_dump(metrics, stream)
