@@ -18,4 +18,5 @@ stages:
     - ogt_protein_classifier_train_evaluate.n_save_per_epoch
     - ogt_protein_classifier_train_evaluate.dropout
     metrics:
-    - ./data/ogt_protein_classifier/metrics.yaml
+    - ./data/ogt_protein_classifier/metrics.yaml:
+      cache: false
