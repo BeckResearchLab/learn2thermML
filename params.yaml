@@ -7,8 +7,8 @@ ogt_protein_classifier_train_evaluate:
   max_upsampling: 0.0
   model: protbert
   protocol: head
-  dropout: 0.0
+  dropout: 0.2
   batch_size: 100
-  epochs: 100
+  epochs: 50
   n_save_per_epoch: 0
   dev_overtrain_one_batch: true

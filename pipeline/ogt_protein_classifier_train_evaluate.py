@@ -343,6 +343,7 @@ if __name__ == '__main__':
         # run it!
         training_results = trainer.train()
         logger.info(f"Training results: {training_results}")
+        training_log = pd.DataFrame(trainer.state.log_history[:-1]).to_dict(orient='list')
 
         # test it
         eval_result = trainer.evaluate()
@@ -350,6 +351,8 @@ if __name__ == '__main__':
 
         # add other metrics
         metrics=dict(eval_result)
+        metrics.update(dict(training_results.metrics))
+        metrics.update(training_log)
         callback = trainer.pop_callback(transformers.integrations.CodeCarbonCallback)
         emissions=callback.tracker.final_emissions
         metrics['model_emissions'] = emissions
