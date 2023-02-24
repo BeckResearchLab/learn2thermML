@@ -233,7 +233,7 @@ if __name__ == '__main__':
         # huggingface trainer sets the whole model to .train() each training step,
         # so we cannot just use .eval() on the model now to turn of bert dropout for a head only model
         # instead manualyl set bert dropout to 0 for a head model.
-        if not params['protocol'] == 'head':
+        if not params['protocol'] in ['head', 'bighead']:
             config.hidden_dropout_prob = params['dropout']
             config.attention_probs_dropout_prob = params['dropout']
         else:
@@ -241,7 +241,12 @@ if __name__ == '__main__':
             config.attention_probs_dropout_prob = 0.0
 
         # load model
-        model = transformers.AutoModelForSequenceClassification.from_pretrained(
+        if params['protocol'] != 'bighead':
+            model_class = transformers.BertForSequenceClassification
+        else:
+            import l2tml_utils.model_utils
+            model_class = l2tml_utils.model_utils.BertForSequenceClassificationBigHead
+        model = model_class.from_pretrained(
             "Rostlab/prot_bert", config=config
         )
 
