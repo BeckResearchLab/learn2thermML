@@ -4,6 +4,8 @@ stages:
     deps:
     - ./pipeline/ogt_protein_classifier_train_evaluate.py
     - ./data/database
+    - ./l2tml_utils/data_utils.py
+    - ./l2tml_utils/model_utils.py
     outs:
     - ./data/ogt_protein_classifier/data
     - ./data/ogt_protein_classifier/model
