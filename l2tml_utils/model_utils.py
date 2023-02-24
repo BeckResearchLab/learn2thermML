@@ -21,13 +21,13 @@ class BertForSequenceClassificationBigHead(transformers.BertForSequenceClassific
         # normal bert classifier
         classifier = []
         classifier.append(nn.Linear(config.hidden_size, config.hidden_size))
-        classifier.append(nn.ReLU)
+        classifier.append(nn.ReLU())
         classifier.append(nn.Dropout(config.classifier_dropout))
         classifier.append(nn.Linear(config.hidden_size, int(config.hidden_size/2)))
-        classifier.append(nn.ReLU)
+        classifier.append(nn.ReLU())
         classifier.append(nn.Dropout(config.classifier_dropout))
         classifier.append(nn.Linear(int(config.hidden_size/2), config.num_labels))
-        self.classifier = nn.ModuleList(classifier)
+        self.classifier = nn.Sequential(*classifier)
 
         # Initialize weights and apply final processing
         self.post_init()

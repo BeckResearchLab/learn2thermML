@@ -272,7 +272,7 @@ if __name__ == '__main__':
         data_emissions = data_tracker.stop()
 
         # fix the model if necessary
-        if params['protocol'] == 'head':
+        if params['protocol'] in ['head', 'bighead']:
             for param in model.bert.parameters():
                 param.requires_grad=False
             logger.info(f'Fixing all but classifer head for finetuning.')
