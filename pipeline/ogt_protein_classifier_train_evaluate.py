@@ -305,7 +305,8 @@ if __name__ == '__main__':
             do_eval=True,
             optim='adamw_hf',
             optim_args=None,
-            learning_rate=5e-5,
+            learning_rate=float(params['lr']),
+            lr_scheduler_type=params['lr_scheduler'],
             num_train_epochs=params['epochs'],
             per_device_train_batch_size=params['batch_size'],
             per_device_eval_batch_size=params['batch_size'],
@@ -353,6 +354,9 @@ if __name__ == '__main__':
         # test it
         eval_result = trainer.evaluate()
         logger.info(f"Evaluation results: {eval_result}")
+        
+        # save model
+        model.save_pretrained('./data/ogt_protein_classifier/model')
 
         # add other metrics
         metrics=dict(eval_result)
