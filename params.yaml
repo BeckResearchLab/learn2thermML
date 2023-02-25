@@ -6,7 +6,7 @@ ogt_protein_classifier_train_evaluate:
   min_balance: 0.5
   max_upsampling: 0.0
   model: protbert
-  protocol: bighead
+  protocol: finetune
   dropout: 0.0
   batch_size: 10
   epochs: 50

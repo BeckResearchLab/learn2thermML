@@ -26,17 +26,17 @@ stages:
         ogt_protein_classifier_train_evaluate.ogt_window:
         - 35.0
         - 60.0
-        ogt_protein_classifier_train_evaluate.protocol: bighead
+        ogt_protein_classifier_train_evaluate.protocol: finetune
         ogt_protein_classifier_train_evaluate.split_type: random
     outs:
     - path: ./data/ogt_protein_classifier/data
-      md5: 6b4d9fe62c59cc15784704b5833c62d0.dir
-      size: 538497
+      md5: 9a73600ac54a8157dd83361c6f6c477d.dir
+      size: 538729
       nfiles: 7
     - path: ./data/ogt_protein_classifier/metrics.yaml
-      md5: b128e21cca13a96459a98cfbdc88177a
-      size: 2243
+      md5: cda30be65baccae4295783c7aee81f00
+      size: 2263
     - path: ./data/ogt_protein_classifier/model
-      md5: 67cb93a1e9687232e23a49fb66f535c6.dir
-      size: 1686534942
+      md5: 48b7adba27edafab71b0b03e3d775762.dir
+      size: 1680240443
       nfiles: 6
