@@ -34,6 +34,12 @@ import evaluate
 import sklearn.utils
 import codecarbon
 
+if 'SLURM_CPUS_ON_NODE' in os.environ:
+    CPU_COUNT = int(os.environ['SLURM_CPUS_ON_NODE'])
+else:
+    import multiprocessing
+    CPU_COUNT = multiprocessing.cpu_count()
+
 import l2tml_utils.data_utils as data_utils
 
 import logging
@@ -87,7 +93,8 @@ if __name__ == '__main__':
 
     # get device
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    logger.info(f'Using device {device}')
+    logger.info(f'Using device {device} for ML')
+    logger.info(f'Using {CPU_COUNT} cpus for multiprocessing')
 
     # load parameters
     with open("./params.yaml", "r") as stream:
@@ -118,8 +125,7 @@ if __name__ == '__main__':
         FROM proteins
         INNER JOIN taxa ON (proteins.taxa_index=taxa.taxa_index)
         WHERE proteins.protein_len<250
-        AND taxa.ogt IS NOT NULL
-        USING SAMPLE 25000""",
+        AND taxa.ogt IS NOT NULL""",
         config_name='test',
         cache_dir='./tmp/hf_cache',
         con=conn)
@@ -134,16 +140,15 @@ if __name__ == '__main__':
     low = params['ogt_window'][0]
     high = params['ogt_window'][1]
     def get_label(example):
-        if example['ogt']<=low:
-            example['labels']=0
-        elif example['ogt']>=high:
-            example['labels']=1
-        else:
-            example['labels']=None
+        ogts = np.array(example['ogt']).reshape(-1,1)
+        labels = np.ones(ogts.shape) * -1
+        labels[ogts <= low] = 0
+        labels[ogts >= high] = 1
+        example['labels'] = list(labels.reshape(-1))
         return example
-    ds = ds.map(get_label)
+    ds = ds.map(get_label, batched=True, batch_size=params['batch_size'], num_proc=CPU_COUNT)
     logger.info('Labeled examples...')
-    ds = ds.filter(lambda e: e['labels'] != None)
+    ds = ds.filter(lambda e: not np.isclose(e['labels'], -1))
     logger.info(f'Removed examples within window, {len(ds)} datapoints remaining')
     logger.info(f'Initial dataset balance: {sum(ds["labels"])/len(ds)}')
     
@@ -212,7 +217,7 @@ if __name__ == '__main__':
     logger.info(f"Weights for class balancing: {class_weight}")
 
     # remove unnecessary columns
-    data_dict = data_dict.map(lambda e: e, remove_columns=['protein_int_index', 'ogt', 'taxa_index', 'taxonomy'])
+    data_dict = data_dict.remove_columns(['protein_int_index', 'ogt', 'taxa_index', 'taxonomy'])
     logger.info(f'Final datasets: {data_dict}')
     data_dict.cleanup_cache_files()
     data_dict.save_to_disk('./data/ogt_protein_classifier/data/')
@@ -259,12 +264,12 @@ if __name__ == '__main__':
             example['protein_seq'] = ' '.join(example['protein_seq'][1:])
             example['protein_seq'] = re.sub(r"[UZOB]", "X", example['protein_seq'])
             return example
-        data_dict = data_dict.map(prepare_aa_seq)
+        data_dict = data_dict.map(prepare_aa_seq, batched=True, batch_size=params['batch_size'], num_proc=CPU_COUNT)
         logger.info('Prepared sequences appropriate for Prot BERT: No M start, spaces between AA, sub UZOB with X')
 
         def tokenizer_fn(examples):
             return tokenizer(examples["protein_seq"], max_length=512, padding="max_length", truncation=True)
-        data_dict = data_dict.map(tokenizer_fn, batched=True)
+        data_dict = data_dict.map(tokenizer_fn, batched=True, batch_size=params['batch_size'], num_proc=CPU_COUNT)
         data_dict = data_dict.remove_columns('protein_seq')
         logger.info(f'Tokenized dataset. {data_dict}')
         
