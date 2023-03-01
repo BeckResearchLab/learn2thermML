@@ -1,37 +1,29 @@
 """Trains and tests a classifier of OGT.
 
 Parameters:
-- `split_type`: 'random', 'taxa_id', int
-  - random: randomly splits proteins into train and dev
-  - taxa_id: keeps proteins from a particular organism together
-  - int: clusters taxa by taxonomy of a particular level, 1 is kingdom, 2 is phylum, etc. Note that this may have errors, as it is based on taxonomy specified in NCBI which sometimes has ambiquity
-- `ogt_window`: (float, float), low and high temparature of window between OGT classes
-- `min_balance`: float or None, minimum balance of classes. class weighted training is always used, but this can be used to speicify downsampling of the 
-    majority class in order to meet a minimum imbalance
-- `max_upsampling`: float, maximum fraction of original minority class to insert into the dataset
-    ignored if `min_balance` is None
 - `model`: 'protbert' or 'DeepTP', which model to start with
 - `protocol`: 'head' or 'finetune'
-  - head: will only train a MLP head to the base model
+  - head: will only train a classifier layer head to the base model
   - finetune: allows predictor head and base model to be backpropegated
+  - bighead: like head but a deeper MLP used for classification
 - `batch_size`: int, batch size for training and evaluation
 - `epochs`: int, total epochs to train, best model is reloaded at the end
+- `lr`: float, learning rate
+- `lr_cheduler`: name og HF LR scheduler like 'linear'
 - `n_save_per_epoch`: int, number of times to evaluate and save model per training epoch. 1 is once at the end of the epoch.
-
+- `dev_overtrain_one_batch`: bool, whether to make the whole dataset a single batch
 """
 import os
 from yaml import safe_load as yaml_load
 from yaml import dump as yaml_dump
 import pandas as pd
 import numpy as np
-import duckdb as ddb
 import re
 
 import datasets
 import transformers
 import torch
 import evaluate
-import sklearn.utils
 import codecarbon
 
 if 'SLURM_CPUS_ON_NODE' in os.environ:
@@ -40,7 +32,7 @@ else:
     import multiprocessing
     CPU_COUNT = multiprocessing.cpu_count()
 
-import l2tml_utils.data_utils as data_utils
+import l2tml_utils.data_utils as model_utils
 
 import logging
 logger = logging.getLogger(__name__)
@@ -82,14 +74,10 @@ if __name__ == '__main__':
     utils_logger = logging.getLogger('l2tml_utils')
     utils_logger.setLevel(getattr(logging, LOGLEVEL))
     utils_logger.addHandler(fh)
-    # datasets.utils.logging.set_verbosity('WARNING')
-    # transformers.utils.logging.set_verbosity(LOGLEVEL)
     
     # create dirs
     if not os.path.exists('./data/ogt_protein_classifier/model'):
         os.mkdir('./data/ogt_protein_classifier/model')
-    if not os.path.exists('./data/ogt_protein_classifier/data'):
-        os.mkdir('./data/ogt_protein_classifier/data')
 
     # get device
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -101,106 +89,18 @@ if __name__ == '__main__':
         params = yaml_load(stream)['ogt_protein_classifier_train_evaluate']
     params['_data_batch_size'] = int(params['batch_size']/CPU_COUNT)
     logger.info(f"Loaded parameters: {params}")
+    ds_batch_params = dict(batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
     
     # start carbon tracker for data processing
-    data_tracker = codecarbon.EmissionsTracker( 
-        project_name="data_process",
+    tracker = codecarbon.EmissionsTracker( 
+        project_name="model_train",
         output_dir="./data/ogt_protein_classifier/model",
     )
-    data_tracker.start()
+    tracker.start()
 
     # get the data
-    conn = ddb.connect("./data/database")
-    # create indexes first
-    conn.execute("CREATE UNIQUE INDEX taxa_index ON taxa (taxa_index)")
-    conn.commit()
-    conn.execute("CREATE INDEX taxa_index_foreign ON proteins (taxa_index)")
-    conn.commit()
-    ds = datasets.Dataset.from_sql(
-        """SELECT 
-            proteins.protein_int_index,
-            proteins.protein_seq,
-            taxa.ogt,
-            taxa.taxa_index,
-            taxa.taxonomy
-        FROM proteins
-        INNER JOIN taxa ON (proteins.taxa_index=taxa.taxa_index)
-        WHERE proteins.protein_len<250
-        AND taxa.ogt IS NOT NULL""",
-        config_name='test',
-        cache_dir='./tmp/hf_cache',
-        con=conn)
-    logger.info(f"Loaded data from database, {len(ds)} total points")
-    conn.close()
-
-    # remove no OGT label
-    ds = ds.filter(lambda e: e['ogt'] != None)
-    logger.info(f"Removed examples without OGT, {len(ds)} datapoints remaining")
-
-    # determine label window
-    low = params['ogt_window'][0]
-    high = params['ogt_window'][1]
-    def get_label(example):
-        ogts = np.array(example['ogt']).reshape(-1,1)
-        labels = np.ones(ogts.shape) * -1
-        labels[ogts <= low] = 0
-        labels[ogts >= high] = 1
-        example['labels'] = list(labels.reshape(-1))
-        return example
-    ds = ds.map(get_label, batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
-    logger.info('Labeled examples...')
-    ds = ds.filter(lambda e: ~np.isclose(e['labels'], -1), batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
-    logger.info(f'Removed examples within window, {len(ds)} datapoints remaining')
-    total_positives = ds.map(lambda e: {'sum': sum(e['labels'])}, batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
-    logger.info(f'Initial dataset balance: {sum(total_positives["sum"])/len(ds)}')
-    
-    # split the data
-    splitter = data_utils.DataSplitter(ds)
-    data_dict = splitter.split(splittype=params['split_type'])
-    data_dict = data_dict.shuffle()
-    logger.info(f"Split data into train and test")
-    train_positives = data_dict['train'].map(lambda e: {'sum': sum(e['labels'])}, batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
-    test_positives = data_dict['test'].map(lambda e: {'sum': sum(e['labels'])}, batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
-    logger.info(f"Train balance: {sum(train_positives['sum'])/len(data_dict['train'])}")
-    logger.info(f"Test balance: {sum(test_positives['sum'])/len(data_dict['test'])}")
-    
-    # class balancing
-    if params['min_balance'] is not None:
-        # split the train into positive and negative
-        data_dict['positive'] = data_dict['train'].filter(lambda e: e['labels']==1)
-        data_dict['positive'] = data_dict['positive'].shuffle()
-        data_dict['negative'] = data_dict['train'].filter(lambda e: e['labels']==0)
-        data_dict['negative'] = data_dict['negative'].shuffle()
-        # get the suggested class data sizes
-        logger.info(f"Conducting balancing for training data with {len(data_dict['positive'])} positive and {len(data_dict['negative'])} negative.")
-        n_negative, n_positive = data_utils.get_balance_data_sizes(
-            len(data_dict['negative']),
-            len(data_dict['positive']),
-            desired_balance=params['min_balance'],
-            max_upsampling=params['max_upsampling'])
-
-        # actualy sample it
-        desired_balance_dict = {'negative': n_negative, 'positive': n_positive}
-        for class_, n_class in desired_balance_dict.items():
-            if n_class < len(data_dict[class_]):
-                # we can just select the first n since its already shuffled for downsampling
-                data_dict[class_] = data_dict[class_].select(range(n_negative))
-            elif n_class > len(data_dict[class_]):
-                # sample with replacement to upsample
-                indexes = np.random.randint(0, len(data_dict[class_]), size=n_class)
-                data_dict[class_] = data_dict[class_].select(indexes)
-            else:
-                pass
-        logger.info(f"Final negative, positive class training sizes: {len(data_dict['negative'])}, {len(data_dict['positive'])}")
-        # stick the data back together
-        data_dict['train'] = datasets.concatenate_datasets([data_dict['positive'], data_dict['negative']]).shuffle()
-        # drop the datasets from processing
-        _ = data_dict.pop('positive')
-        _.cleanup_cache_files()
-        del(_)
-        _ = data_dict.pop('negative')
-        _.cleanup_cache_files()
-        del(_)
+    data_dict = datasets.load_from_disk('./data/ogt_protein_classifier/data')
+    logger.info(f"Loaded data: {data_dict}")
 
     # DEV OPTION IGNORE FOR NORMAL OPERATION
     ########################################
@@ -211,21 +111,12 @@ if __name__ == '__main__':
     ########################################
 
     # class weighting for imbalance
-    classes = [0,1]
-    class_weight = sklearn.utils.class_weight.compute_class_weight(
-        'balanced',
-        classes=classes,
-        y=data_dict['train']['labels']
-    )
+    train_positives = data_dict['train'].map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params, remove_columns=data_dict['train'].column_names, desc="Counting train positives")
+    train_positives = sum(train_positives['sum'])
+    positive_balance = train_positives/len(data_dict['train'])
+    class_weight = [positive_balance/(1-positive_balance), 1.0]
     class_weight=torch.tensor(class_weight, dtype=torch.float).to(device)
     logger.info(f"Weights for class balancing: {class_weight}")
-
-    # remove unnecessary columns
-    data_dict = data_dict.remove_columns(['protein_int_index', 'ogt', 'taxa_index', 'taxonomy'])
-    logger.info(f'Final datasets: {data_dict}')
-    data_dict.cleanup_cache_files()
-    data_dict.save_to_disk('./data/ogt_protein_classifier/data/')
-    logger.info("Saved data to disk.")
     
     # sending data
     data_dict = data_dict.with_format("torch")
@@ -268,17 +159,14 @@ if __name__ == '__main__':
             example['protein_seq'] = ' '.join(example['protein_seq'][1:])
             example['protein_seq'] = re.sub(r"[UZOB]", "X", example['protein_seq'])
             return example
-        data_dict = data_dict.map(prepare_aa_seq, batched=True, batch_size=params['batch_size'], num_proc=CPU_COUNT)
+        data_dict = data_dict.map(prepare_aa_seq, **ds_batch_params, desc="Reformatting AA sequences for BERT")
         logger.info('Prepared sequences appropriate for Prot BERT: No M start, spaces between AA, sub UZOB with X')
 
         def tokenizer_fn(examples):
             return tokenizer(examples["protein_seq"], max_length=512, padding="max_length", truncation=True)
-        data_dict = data_dict.map(tokenizer_fn, batched=True, batch_size=params['batch_size'], num_proc=CPU_COUNT)
+        data_dict = data_dict.map(tokenizer_fn, **ds_batch_params, desc="Tokenizing data")
         data_dict = data_dict.remove_columns('protein_seq')
         logger.info(f'Tokenized dataset. {data_dict}')
-        
-        # get data processing emissions
-        data_emissions = data_tracker.stop()
 
         # fix the model if necessary
         if params['protocol'] in ['head', 'bighead']:
@@ -355,6 +243,9 @@ if __name__ == '__main__':
         )
         logger.info(f"Training parameters ready: {training_args}, beginning.")
         
+        # remove the codecarbon callback, doing this manually
+        trainer.remove_callback(transformers.integrations.CodeCarbonCallback)
+
         # run it!
         training_results = trainer.train()
         logger.info(f"Training results: {training_results}")
@@ -371,14 +262,13 @@ if __name__ == '__main__':
         metrics=dict(eval_result)
         metrics.update(dict(training_results.metrics))
         metrics.update(training_log)
-        callback = trainer.pop_callback(transformers.integrations.CodeCarbonCallback)
-        emissions=callback.tracker.final_emissions
-        metrics['model_emissions'] = emissions
-        metrics['data_emissions'] = data_emissions
+        emissions=float(tracker.stop())
+        metrics['emissions'] = emissions
+        metrics = {'ogt_cfr_model_'+k: v for k, v in metrics.items()}
 
     else:
         raise NotImplementedError(f"Model type {params['model']} not available")
 
     # save metrics
-    with open('./data/ogt_protein_classifier/metrics.yaml', "w") as stream:
+    with open('./data/ogt_protein_classifier/model_metrics.yaml', "w") as stream:
         yaml_dump(metrics, stream)
