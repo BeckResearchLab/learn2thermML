@@ -116,11 +116,11 @@ if __name__ == '__main__':
         labels[ogts >= high] = 1
         examples['labels'] = list(labels.reshape(-1))
         return examples
-    ds = ds.map(get_label, **ds_batch_params)
+    ds = ds.map(get_label, **ds_batch_params, desc="Applying labels to raw OGT")
     logger.info('Labeled examples...')
-    ds = ds.filter(lambda e: list(~np.isclose(np.array(e['labels']), -1)), **ds_batch_params)
+    ds = ds.filter(lambda e: list(~np.isclose(np.array(e['labels']), -1)), **ds_batch_params, desc="Removing examples in OGT window")
     logger.info(f'Removed examples within window, {len(ds)} datapoints remaining')
-    total_positives = ds.map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params)
+    total_positives = ds.map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params, remove_columns=ds.column_names, desc="Counting total number of positives")
     logger.info(f'Initial dataset balance: {sum(total_positives["sum"])/len(ds)}')
     
     # split the data
@@ -128,17 +128,17 @@ if __name__ == '__main__':
     data_dict = splitter.split(splittype=params['split_type'])
     data_dict = data_dict.shuffle()
     logger.info(f"Split data into train and test")
-    train_positives = data_dict['train'].map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params)
-    test_positives = data_dict['test'].map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params)
+    train_positives = data_dict['train'].map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params, remove_columns=data_dict['train'].column_names, desc="Counting train positives")
+    test_positives = data_dict['test'].map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params, remove_columns=data_dict['test'].column_names, desc="Counting test positives")
     logger.info(f"Train balance: {sum(train_positives['sum'])/len(data_dict['train'])}")
     logger.info(f"Test balance: {sum(test_positives['sum'])/len(data_dict['test'])}")
     
     # class balancing
     if params['min_balance'] is not None:
         # split the train into positive and negative
-        data_dict['positive'] = data_dict['train'].filter(lambda e: list(np.isclose(e['labels'], 1)), **ds_batch_params)
+        data_dict['positive'] = data_dict['train'].filter(lambda e: list(np.isclose(e['labels'], 1)), **ds_batch_params, desc="Splitting out positives for balancing")
         data_dict['positive'] = data_dict['positive'].shuffle()
-        data_dict['negative'] = data_dict['train'].filter(lambda e: list(np.isclose(e['labels'], 0)), **ds_batch_params)
+        data_dict['negative'] = data_dict['train'].filter(lambda e: list(np.isclose(e['labels'], 0)), **ds_batch_params, desc="Splitting our negatives for balancing")
         data_dict['negative'] = data_dict['negative'].shuffle()
         # get the suggested class data sizes
         logger.info(f"Conducting balancing for training data with {len(data_dict['positive'])} positive and {len(data_dict['negative'])} negative.")
@@ -153,11 +153,11 @@ if __name__ == '__main__':
         for class_, n_class in desired_balance_dict.items():
             if n_class < len(data_dict[class_]):
                 # we can just select the first n since its already shuffled for downsampling
-                data_dict[class_] = data_dict[class_].select(range(n_negative), **ds_batch_params)
+                data_dict[class_] = data_dict[class_].select(range(n_negative))
             elif n_class > len(data_dict[class_]):
                 # sample with replacement to upsample
                 indexes = np.random.randint(0, len(data_dict[class_]), size=n_class)
-                data_dict[class_] = data_dict[class_].select(indexes, **ds_batch_params)
+                data_dict[class_] = data_dict[class_].select(indexes)
             else:
                 pass
         logger.info(f"Final negative, positive class training sizes: {len(data_dict['negative'])}, {len(data_dict['positive'])}")
@@ -173,7 +173,7 @@ if __name__ == '__main__':
 
     # remove unnecessary columns
     if not params['dev_keep_columns']:
-        ata_dict = data_dict.remove_columns(['protein_int_index', 'ogt', 'taxa_index', 'taxonomy'])
+        data_dict = data_dict.remove_columns(['protein_int_index', 'ogt', 'taxa_index', 'taxonomy'])
     logger.info(f'Final datasets: {data_dict}')
     data_dict.cleanup_cache_files()
     data_dict.save_to_disk('./data/ogt_protein_classifier/data/')
