@@ -3,43 +3,35 @@ stages:
   ogt_protein_classifier_train_evaluate:
     cmd: python pipeline/ogt_protein_classifier_train_evaluate.py
     deps:
-    - path: ./data/database
-      md5: 3d1fb0c6b918014c9959ebab31ca9c32
-      size: 34096820224
-    - path: ./l2tml_utils/data_utils.py
-      md5: 37c459566103785886ffa2d02f094a7d
-      size: 5836
+    - path: ./data/ogt_protein_classifier/data
+      md5: 67ecd84ff94acac0604d372aec695eb9.dir
+      size: 485262352
+      nfiles: 33
     - path: ./l2tml_utils/model_utils.py
       md5: fc53e5d35144ecd5cfc4a1dde9262679
       size: 1485
     - path: ./pipeline/ogt_protein_classifier_train_evaluate.py
-      md5: b5a0fdf36a335ea8769b4a532dc3e276
-      size: 15915
+      md5: 610bfc127db0cc8d9643f280c38e71ef
+      size: 11857
     params:
       params.yaml:
-        ogt_protein_classifier_train_evaluate.batch_size: 10
+        ogt_protein_classifier_train_evaluate.batch_size: 200
+        ogt_protein_classifier_train_evaluate.dev_overtrain_one_batch: true
         ogt_protein_classifier_train_evaluate.dropout: 0.0
         ogt_protein_classifier_train_evaluate.epochs: 50
-        ogt_protein_classifier_train_evaluate.min_balance: 0.5
+        ogt_protein_classifier_train_evaluate.lr: 5e-05
+        ogt_protein_classifier_train_evaluate.lr_scheduler: linear
         ogt_protein_classifier_train_evaluate.model: protbert
         ogt_protein_classifier_train_evaluate.n_save_per_epoch: 0
-        ogt_protein_classifier_train_evaluate.ogt_window:
-        - 35.0
-        - 60.0
         ogt_protein_classifier_train_evaluate.protocol: finetune
-        ogt_protein_classifier_train_evaluate.split_type: random
     outs:
-    - path: ./data/ogt_protein_classifier/data
-      md5: 9a73600ac54a8157dd83361c6f6c477d.dir
-      size: 538729
-      nfiles: 7
-    - path: ./data/ogt_protein_classifier/metrics.yaml
-      md5: cda30be65baccae4295783c7aee81f00
-      size: 2263
     - path: ./data/ogt_protein_classifier/model
-      md5: 48b7adba27edafab71b0b03e3d775762.dir
-      size: 1680240443
+      md5: 8d062b30e33e8f66873b1d8af702305b.dir
+      size: 1680240020
       nfiles: 6
+    - path: ./data/ogt_protein_classifier/model_metrics.yaml
+      md5: 706232d147b2515663ed3ff1324205fd
+      size: 2425
   ogt_protein_classifier_data_prep:
     cmd: python pipeline/ogt_protein_classifier_data_prep.py
     deps:

@@ -11,6 +11,8 @@ Parameters:
 - `lr`: float, learning rate
 - `lr_cheduler`: name og HF LR scheduler like 'linear'
 - `n_save_per_epoch`: int, number of times to evaluate and save model per training epoch. 1 is once at the end of the epoch.
+- `grad_checkpointing`: bool, whehert to train with grad checkpointing
+- `grad_accum`: int, number of gradients to accumulate before backprop
 - `dev_overtrain_one_batch`: bool, whether to make the whole dataset a single batch
 """
 import os
@@ -107,6 +109,7 @@ if __name__ == '__main__':
     # cut training data to a single batch to check if we can overfit
     if params["dev_overtrain_one_batch"]:
         data_dict['train'] = data_dict['train'].select(range(params['batch_size']))
+        data_dict['test'] = data_dict['test'].select(range(params['batch_size']))
         logger.info(f"Overfitting test on a single example...")
     ########################################
 
@@ -155,10 +158,11 @@ if __name__ == '__main__':
         logger.info(f"Loaded ProtBERT model and tokenizer. Model config: {model.config}")
 
         # tokenize the data
-        def prepare_aa_seq(example):
-            example['protein_seq'] = ' '.join(example['protein_seq'][1:])
-            example['protein_seq'] = re.sub(r"[UZOB]", "X", example['protein_seq'])
-            return example
+        def prepare_aa_seq(examples):
+            seqs = [' '.join(e[1:]) for e in examples['protein_seq']]
+            seqs = [re.sub(r"[UZOB]", "X", e) for e in seqs]
+            examples['protein_seq'] = seqs
+            return examples
         data_dict = data_dict.map(prepare_aa_seq, **ds_batch_params, desc="Reformatting AA sequences for BERT")
         logger.info('Prepared sequences appropriate for Prot BERT: No M start, spaces between AA, sub UZOB with X')
 
@@ -207,6 +211,9 @@ if __name__ == '__main__':
             num_train_epochs=params['epochs'],
             per_device_train_batch_size=params['batch_size'],
             per_device_eval_batch_size=params['batch_size'],
+            gradient_accumulation_steps=params['grad_accum'],
+            gradient_checkpointing=params['grad_checkpointing'],
+            fp16=params['fp16'],
             log_level='info',
             logging_strategy='steps',
             logging_steps=1,
