@@ -50,8 +50,8 @@ stages:
       md5: 37c459566103785886ffa2d02f094a7d
       size: 5836
     - path: ./pipeline/ogt_protein_classifier_data_prep.py
-      md5: 2e42f43496ff1430854403de8944fdff
-      size: 8603
+      md5: e4469b6e12cefa21dbc23aafb5325603
+      size: 8615
     params:
       params.yaml:
         ogt_protein_classifier_data_prep.data_batch_size: 1000
@@ -66,9 +66,9 @@ stages:
         ogt_protein_classifier_data_prep.split_type: random
     outs:
     - path: ./data/ogt_protein_classifier/data
-      md5: 558687b4405c94158071a48935f232fa.dir
-      size: 483450253
+      md5: 87d83ef1555b9478e130af0c046daae5.dir
+      size: 483746776
       nfiles: 8
     - path: ./data/ogt_protein_classifier/data_metrics.yaml
-      md5: e289c2fb589875f73b65ece9d7dcc682
+      md5: 2af9dd7da110c487f36dab34c748393c
       size: 97

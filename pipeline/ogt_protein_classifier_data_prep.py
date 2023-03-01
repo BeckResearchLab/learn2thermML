@@ -114,7 +114,7 @@ if __name__ == '__main__':
         labels = np.ones(ogts.shape) * -1
         labels[ogts <= low] = 0
         labels[ogts >= high] = 1
-        examples['labels'] = list(labels.reshape(-1))
+        examples['labels'] = list(labels.reshape(-1).astype(int))
         return examples
     ds = ds.map(get_label, **ds_batch_params, desc="Applying labels to raw OGT")
     logger.info('Labeled examples...')
