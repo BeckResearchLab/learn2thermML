@@ -1,24 +1,40 @@
 stages:
+  ogt_protein_classifier_data_prep:
+    cmd: python pipeline/ogt_protein_classifier_data_prep.py
+    deps:
+      - ./pipeline/ogt_protein_classifier_data_prep.py
+      - ./data/database
+      - ./l2tml_utils/data_utils.py
+    outs:
+      - ./data/ogt_protein_classifier/data
+    params:
+      - ogt_protein_classifier_data_prep.split_type
+      - ogt_protein_classifier_data_prep.ogt_window
+      - ogt_protein_classifier_data_prep.max_protein_len
+      - ogt_protein_classifier_data_prep.min_balance
+      - ogt_protein_classifier_data_prep.data_batch_size
+      - ogt_protein_classifier_data_prep.dev_keep_columns
+    metrics:
+    - ./data/ogt_protein_classifier/data_metrics.yaml:
+        cache: false
   ogt_protein_classifier_train_evaluate:
     cmd: python pipeline/ogt_protein_classifier_train_evaluate.py
     deps:
     - ./pipeline/ogt_protein_classifier_train_evaluate.py
-    - ./data/database
-    - ./l2tml_utils/data_utils.py
     - ./l2tml_utils/model_utils.py
-    outs:
     - ./data/ogt_protein_classifier/data
+    outs:
     - ./data/ogt_protein_classifier/model
     params:
-    - ogt_protein_classifier_train_evaluate.split_type
-    - ogt_protein_classifier_train_evaluate.ogt_window
-    - ogt_protein_classifier_train_evaluate.min_balance
     - ogt_protein_classifier_train_evaluate.model
     - ogt_protein_classifier_train_evaluate.protocol
     - ogt_protein_classifier_train_evaluate.batch_size
     - ogt_protein_classifier_train_evaluate.epochs
     - ogt_protein_classifier_train_evaluate.n_save_per_epoch
     - ogt_protein_classifier_train_evaluate.dropout
+    - ogt_protein_classifier_train_evaluate.dev_overtrain_one_batch
+    - ogt_protein_classifier_train_evaluate.lr_scheduler
+    - ogt_protein_classifier_train_evaluate.lr
     metrics:
-    - ./data/ogt_protein_classifier/metrics.yaml:
+    - ./data/ogt_protein_classifier/model_metrics.yaml:
         cache: false
