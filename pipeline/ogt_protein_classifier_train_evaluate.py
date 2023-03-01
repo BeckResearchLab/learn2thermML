@@ -99,6 +99,7 @@ if __name__ == '__main__':
     # load parameters
     with open("./params.yaml", "r") as stream:
         params = yaml_load(stream)['ogt_protein_classifier_train_evaluate']
+    params['_data_batch_size'] = int(params['batch_size']/CPU_COUNT)
     logger.info(f"Loaded parameters: {params}")
     
     # start carbon tracker for data processing
@@ -146,19 +147,22 @@ if __name__ == '__main__':
         labels[ogts >= high] = 1
         example['labels'] = list(labels.reshape(-1))
         return example
-    ds = ds.map(get_label, batched=True, batch_size=params['batch_size'], num_proc=CPU_COUNT)
+    ds = ds.map(get_label, batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
     logger.info('Labeled examples...')
-    ds = ds.filter(lambda e: not np.isclose(e['labels'], -1))
+    ds = ds.filter(lambda e: ~np.isclose(e['labels'], -1), batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
     logger.info(f'Removed examples within window, {len(ds)} datapoints remaining')
-    logger.info(f'Initial dataset balance: {sum(ds["labels"])/len(ds)}')
+    total_positives = ds.map(lambda e: {'sum': sum(e['labels'])}, batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
+    logger.info(f'Initial dataset balance: {sum(total_positives["sum"])/len(ds)}')
     
     # split the data
     splitter = data_utils.DataSplitter(ds)
     data_dict = splitter.split(splittype=params['split_type'])
     data_dict = data_dict.shuffle()
     logger.info(f"Split data into train and test")
-    logger.info(f"Train balance: {sum(data_dict['train']['labels'])/len(data_dict['train'])}")
-    logger.info(f"Test balance: {sum(data_dict['test']['labels'])/len(data_dict['test'])}")
+    train_positives = data_dict['train'].map(lambda e: {'sum': sum(e['labels'])}, batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
+    test_positives = data_dict['test'].map(lambda e: {'sum': sum(e['labels'])}, batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
+    logger.info(f"Train balance: {sum(train_positives['sum'])/len(data_dict['train'])}")
+    logger.info(f"Test balance: {sum(test_positives['sum'])/len(data_dict['test'])}")
     
     # class balancing
     if params['min_balance'] is not None:
