@@ -86,8 +86,7 @@ if __name__ == '__main__':
     conn.commit()
     conn.execute("CREATE INDEX taxa_index_foreign ON proteins (taxa_index)")
     conn.commit()
-    ds = datasets.Dataset.from_sql(
-        f"""SELECT 
+    select_statement = f"""SELECT 
             proteins.protein_int_index,
             proteins.protein_seq,
             taxa.ogt,
@@ -96,7 +95,11 @@ if __name__ == '__main__':
         FROM proteins
         INNER JOIN taxa ON (proteins.taxa_index=taxa.taxa_index)
         WHERE proteins.protein_len<{params['max_protein_len']}
-        AND taxa.ogt IS NOT NULL""",
+        AND taxa.ogt IS NOT NULL"""
+    if params['dev_sample_init_data']:
+        select_statement = select_statement + " USING SAMPLE 100000"
+    ds = datasets.Dataset.from_sql(
+        select_statement,
         config_name='test',
         cache_dir='./tmp/hf_cache',
         con=conn)
