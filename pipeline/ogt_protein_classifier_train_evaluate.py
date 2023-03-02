@@ -132,7 +132,6 @@ if __name__ == '__main__':
         
         # set hyperparam changes to config
         config.num_labels = 2
-        config.classifier_dropout = params['dropout']
         # huggingface trainer sets the whole model to .train() each training step,
         # so we cannot just use .eval() on the model now to turn of bert dropout for a head only model
         # instead manualyl set bert dropout to 0 for a head model.
@@ -154,7 +153,7 @@ if __name__ == '__main__':
         )
 
         # and tokenizer
-        tokenizer = transformers.AutoTokenizer.from_pretrained("Rostlab/prot_bert")
+        tokenizer = transformers.AutoTokenizer.from_pretrained("Rostlab/prot_bert", do_lower_case=False)
         logger.info(f"Loaded ProtBERT model and tokenizer. Model config: {model.config}")
 
         # tokenize the data
@@ -192,6 +191,8 @@ if __name__ == '__main__':
         
         # compute the saving and evaluation timeframe
         n_steps_per_epoch = int(len(data_dict['train']) / params['batch_size'])
+        if params['grad_accum']:
+            n_steps_per_epoch = int(n_steps_per_epoch/params['grad_accum'])
         if params['n_save_per_epoch'] == 0:
             n_steps_per_save = None
             save_strategy = 'no'
