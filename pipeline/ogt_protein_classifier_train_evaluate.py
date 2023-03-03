@@ -143,11 +143,15 @@ if __name__ == '__main__':
             config.attention_probs_dropout_prob = 0.0
 
         # load model
+        # first get model class
         if params['protocol'] != 'bighead':
             model_class = transformers.BertForSequenceClassification
         else:
             import l2tml_utils.model_utils
             model_class = l2tml_utils.model_utils.BertForSequenceClassificationBigHead
+        # next check if we are starting from an internal checkpoint of the
+        # HF hub one
+        if 
         model = model_class.from_pretrained(
             "Rostlab/prot_bert", config=config
         )
@@ -238,6 +242,9 @@ if __name__ == '__main__':
 
             return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val}
         
+        # set up a dvccallback
+        dvc_callback = l2tml_utils.model_utils.DVCLiveCallback(dir='./data/ogt_protein_classifier/dvclive/')
+
         # send model to device and go
         model.to(device)
         logger.info(f"Model ready for training: {model}")
@@ -248,6 +255,7 @@ if __name__ == '__main__':
             train_dataset=data_dict['train'],
             eval_dataset=data_dict['test'],
             compute_metrics=compute_metrics,
+            callbacks=[dvc_callback]
         )
         logger.info(f"Training parameters ready: {training_args}, beginning.")
         
@@ -266,7 +274,7 @@ if __name__ == '__main__':
         # save model
         model.save_pretrained('./data/ogt_protein_classifier/model')
 
-        # add other metrics
+        # add end of training metrics
         metrics=dict(eval_result)
         metrics.update(dict(training_results.metrics))
         metrics.update(training_log)

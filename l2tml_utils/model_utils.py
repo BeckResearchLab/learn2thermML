@@ -1,5 +1,13 @@
+"""Children classes of huggingface functionality to be used for training"""
+
 import transformers
 from torch import nn
+
+from dvclive
+from dvclive.utils import standardize_metric_name
+
+from typing import Optional
+
 
 
 class BertForSequenceClassificationBigHead(transformers.BertForSequenceClassification):
@@ -31,3 +39,52 @@ class BertForSequenceClassificationBigHead(transformers.BertForSequenceClassific
 
         # Initialize weights and apply final processing
         self.post_init()
+
+
+class DVCLiveCallback(transformers.TrainerCallback):
+    """HF callback for use with DVCLive.
+    
+    DVC's implimentation own implimentation has the following non-ideal features:
+    - dvc live step is each logging step, instead of each eval step
+    - it manually saves model at each epoch. 
+
+    Here, on evaluate the metrics are recorded, and triggers the trainer control to
+    save at this gradient ste. Then, on save, the dvclive step is taken.
+    """
+    
+    def __init__(self, live: Optional[dvclive.Live] = None, **kwargs):
+        super().__init__()
+        self.live = live if live is not None else dvclive.Live(**kwargs)
+
+    def on_save(
+        self,
+        args: transformers.TrainingArguments,
+        state: transformers.TrainerState,
+        control: transformers.TrainerControl,
+        **kwargs
+    ):
+        """DVC should checkpoint"""
+        self.live.next_step()
+
+    def on_evaluate(
+        self,
+        args: transformers.TrainingArguments,
+        state: transformers.TrainerState,
+        control: transformers.TrainerControl,
+        **kwargs
+    ):
+        metrics = kwargs.get('metrics')
+        for key, value in metrics.items():
+            self.live.log_metric(standardize_metric_name(key, __name__), value)
+        # if not already going to save, make sure it does
+        # on_save above will be called and next step starts
+        control.should_save=True
+
+    def on_train_end(
+        self,
+        args: transformers.TrainingArguments,
+        state: transformers.TrainerState,
+        control: transformers.TrainerControl,
+        **kwargs
+    ):
+        self.live.end()

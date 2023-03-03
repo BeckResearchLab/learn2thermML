@@ -26,7 +26,8 @@ stages:
     - ./l2tml_utils/model_utils.py
     - ./data/ogt_protein_classifier/data
     outs:
-    - ./data/ogt_protein_classifier/model
+    - ./data/ogt_protein_classifier/model:
+        checkpoint: true
     params:
     - ogt_protein_classifier_train_evaluate.model
     - ogt_protein_classifier_train_evaluate.protocol
@@ -40,3 +41,6 @@ stages:
     metrics:
     - ./data/ogt_protein_classifier/model_metrics.yaml:
         cache: false
+    - ./data/pgt_protein_classifier/dvclive/metrics.json:
+        cache: false
+        persist: true
