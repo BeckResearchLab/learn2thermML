@@ -41,6 +41,6 @@ stages:
     metrics:
     - ./data/ogt_protein_classifier/model_metrics.yaml:
         cache: false
-    - ./data/pgt_protein_classifier/dvclive/metrics.json:
+    - ./data/ogt_protein_classifier/dvclive/metrics.json:
         cache: false
         persist: true

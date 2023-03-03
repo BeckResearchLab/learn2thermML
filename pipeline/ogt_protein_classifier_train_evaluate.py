@@ -34,7 +34,7 @@ else:
     import multiprocessing
     CPU_COUNT = multiprocessing.cpu_count()
 
-import l2tml_utils.data_utils as model_utils
+import l2tml_utils.model_utils as model_utils
 
 import logging
 logger = logging.getLogger(__name__)
@@ -147,17 +147,18 @@ if __name__ == '__main__':
         if params['protocol'] != 'bighead':
             model_class = transformers.BertForSequenceClassification
         else:
-            import l2tml_utils.model_utils
-            model_class = l2tml_utils.model_utils.BertForSequenceClassificationBigHead
+            model_class = model_utils.BertForSequenceClassificationBigHead
         # next check if we are starting from an internal checkpoint of the
         # HF hub one
         checkpoints  = [f for f in os.listdir('./data/ogt_protein_classifier/model/') if f.startswith('checkpoint')]
         if len(checkpoints) == 0:
+            logging.info("Using original Protein Bert weights")
             pretrained_weights_location = "Rostlab/prot_bert"
         else:
             checkpoints_nums = [int(c.split('-')[-1]) for c in checkpoints]
             pretrained_weights_location = checkpoints[np.argmax(checkpoints_nums)]
             pretrained_weights_location = './data/ogt_protein_classifier/model/'+pretrained_weights_location
+            logging.info(f"Using weights loaded from local checkpoint: {pretrained_weights_location}")
         model = model_class.from_pretrained(
             pretrained_weights_location, config=config
         )
@@ -249,7 +250,7 @@ if __name__ == '__main__':
             return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val}
         
         # set up a dvccallback
-        dvc_callback = l2tml_utils.model_utils.DVCLiveCallback(dir='./data/ogt_protein_classifier/dvclive/')
+        dvc_callback = model_utils.DVCLiveCallback(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False)
 
         # send model to device and go
         model.to(device)

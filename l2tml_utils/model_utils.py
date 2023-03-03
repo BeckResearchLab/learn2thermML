@@ -3,7 +3,7 @@
 import transformers
 from torch import nn
 
-from dvclive
+import dvclive
 from dvclive.utils import standardize_metric_name
 
 from typing import Optional
@@ -65,6 +65,21 @@ class DVCLiveCallback(transformers.TrainerCallback):
     ):
         """DVC should checkpoint"""
         self.live.next_step()
+
+    def on_log(
+        self,
+        args: transformers.TrainingArguments,
+        state: transformers.TrainerState,
+        control: transformers.TrainerControl,
+        **kwargs
+    ):
+        # saves training status as metrics to dvc, note that 
+        # this only occurs when an evaluation step is necessary
+        # logs are not available in the on_evaluate event
+        logs = kwargs["logs"]
+        if control.should_evaluate:
+            for key, value in logs.items():
+                self.live.log_metric(standardize_metric_name(key, __name__), value)
 
     def on_evaluate(
         self,

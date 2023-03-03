@@ -5,13 +5,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - dvc=2.27.2
-  - dvc-data=0.10.0
-  - dvc-http=2.19.1
-  - dvc-objects=0.4.0
-  - dvc-render=0.0.11
-  - dvc-ssh=2.19.0
-  - dvc-task=0.1.2
+  - dvc
   - filelock=3.8.0
   - matplotlib=3.6.0
   - pandas=1.5.0
@@ -29,5 +23,5 @@ dependencies:
   - pip:
     - duckdb==0.7.0
     - codecarbon==2.1.4
-    - dvclive==0.11.0
+    - dvclive==2.1.0
 
