@@ -151,9 +151,15 @@ if __name__ == '__main__':
             model_class = l2tml_utils.model_utils.BertForSequenceClassificationBigHead
         # next check if we are starting from an internal checkpoint of the
         # HF hub one
-        if 
+        checkpoints  = [f for f in os.listdir('./data/ogt_protein_classifier/model/') if f.startswith('checkpoint')]
+        if len(checkpoints) == 0:
+            pretrained_weights_location = "Rostlab/prot_bert"
+        else:
+            checkpoints_nums = [int(c.split('-')[-1]) for c in checkpoints]
+            pretrained_weights_location = checkpoints[np.argmax(checkpoints_nums)]
+            pretrained_weights_location = './data/ogt_protein_classifier/model/'+pretrained_weights_location
         model = model_class.from_pretrained(
-            "Rostlab/prot_bert", config=config
+            pretrained_weights_location, config=config
         )
 
         # and tokenizer
