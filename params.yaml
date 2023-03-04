@@ -4,6 +4,7 @@ ogt_protein_classifier_data_prep:
   - 35.0
   - 60.0
   max_protein_len: 250
+  train_test_frac: 0.02
   min_balance: 0.5
   max_upsampling: 0.0
   data_batch_size: 1000
@@ -17,7 +18,7 @@ ogt_protein_classifier_train_evaluate:
   epochs: 5
   lr: 5e-5
   lr_scheduler: linear
-  n_save_per_epoch: 2
+  n_save_per_epoch: 1
   grad_checkpointing: true
   grad_accum: 4
   fp16: true

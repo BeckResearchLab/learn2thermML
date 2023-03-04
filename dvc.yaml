@@ -28,6 +28,8 @@ stages:
     outs:
     - ./data/ogt_protein_classifier/model:
         checkpoint: true
+    - ./data/ogt_protein_classifier/dvclive/report.md:
+        cache: false
     params:
     - ogt_protein_classifier_train_evaluate.model
     - ogt_protein_classifier_train_evaluate.protocol
@@ -44,3 +46,7 @@ stages:
     - ./data/ogt_protein_classifier/dvclive/metrics.json:
         cache: false
         persist: true
+    plots:
+      - ./data/ogt_protein_classifier/dvclive/plots:
+          cache: false
+          persist: true

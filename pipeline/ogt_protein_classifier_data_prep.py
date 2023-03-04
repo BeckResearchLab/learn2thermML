@@ -125,7 +125,7 @@ if __name__ == '__main__':
     
     # split the data
     splitter = data_utils.DataSplitter(ds)
-    data_dict = splitter.split(splittype=params['split_type'])
+    data_dict = splitter.split(splittype=params['split_type'], frac=params['train_test_frac'])
     data_dict = data_dict.shuffle()
     logger.info(f"Split data into train and test")
     train_positives = data_dict['train'].map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params, remove_columns=data_dict['train'].column_names, desc="Counting train positives")
