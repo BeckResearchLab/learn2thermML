@@ -150,15 +150,17 @@ if __name__ == '__main__':
             model_class = model_utils.BertForSequenceClassificationBigHead
         # next check if we are starting from an internal checkpoint of the
         # HF hub one
+        # get the checkpoints on disk that are not empty
         checkpoints  = [f for f in os.listdir('./data/ogt_protein_classifier/model/') if f.startswith('checkpoint')]
+        checkpoints = [f for f in checkpoints if len(os.listdir('./data/ogt_protein_classifier/model/'+f)) > 0]
         if len(checkpoints) == 0:
-            logging.info("Using original Protein Bert weights")
+            logger.info("Using original Protein Bert weights")
             pretrained_weights_location = "Rostlab/prot_bert"
         else:
             checkpoints_nums = [int(c.split('-')[-1]) for c in checkpoints]
             pretrained_weights_location = checkpoints[np.argmax(checkpoints_nums)]
             pretrained_weights_location = './data/ogt_protein_classifier/model/'+pretrained_weights_location
-            logging.info(f"Using weights loaded from local checkpoint: {pretrained_weights_location}")
+            logger.info(f"Using weights loaded from local checkpoint: {pretrained_weights_location}")
         model = model_class.from_pretrained(
             pretrained_weights_location, config=config
         )
@@ -224,6 +226,7 @@ if __name__ == '__main__':
             per_device_train_batch_size=params['batch_size'],
             per_device_eval_batch_size=params['batch_size'],
             gradient_accumulation_steps=params['grad_accum'],
+            eval_accumulation_steps=params['grad_accum'],
             gradient_checkpointing=params['grad_checkpointing'],
             fp16=params['fp16'],
             log_level='info',
@@ -250,7 +253,7 @@ if __name__ == '__main__':
             return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val}
         
         # set up a dvccallback
-        dvc_callback = model_utils.DVCLiveCallback(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False)
+        dvc_callback = model_utils.DVCLiveCallback(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False, report='md')
 
         # send model to device and go
         model.to(device)
