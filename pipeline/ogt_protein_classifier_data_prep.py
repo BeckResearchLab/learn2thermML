@@ -136,40 +136,41 @@ if __name__ == '__main__':
     # class balancing
     if params['min_balance'] is not None:
         # split the train into positive and negative
-        data_dict['positive'] = data_dict['train'].filter(lambda e: list(np.isclose(e['labels'], 1)), **ds_batch_params, desc="Splitting out positives for balancing")
-        data_dict['positive'] = data_dict['positive'].shuffle()
-        data_dict['negative'] = data_dict['train'].filter(lambda e: list(np.isclose(e['labels'], 0)), **ds_batch_params, desc="Splitting our negatives for balancing")
-        data_dict['negative'] = data_dict['negative'].shuffle()
-        # get the suggested class data sizes
-        logger.info(f"Conducting balancing for training data with {len(data_dict['positive'])} positive and {len(data_dict['negative'])} negative.")
-        n_negative, n_positive = data_utils.get_balance_data_sizes(
-            len(data_dict['negative']),
-            len(data_dict['positive']),
-            desired_balance=params['min_balance'],
-            max_upsampling=params['max_upsampling'])
+        for part in ['train', 'test']:
+            data_dict['positive'] = data_dict[part].filter(lambda e: list(np.isclose(e['labels'], 1)), **ds_batch_params, desc="Splitting out positives for balancing")
+            data_dict['positive'] = data_dict['positive'].shuffle()
+            data_dict['negative'] = data_dict[part].filter(lambda e: list(np.isclose(e['labels'], 0)), **ds_batch_params, desc="Splitting our negatives for balancing")
+            data_dict['negative'] = data_dict['negative'].shuffle()
+            # get the suggested class data sizes
+            logger.info(f"Conducting balancing for {part} data with {len(data_dict['positive'])} positive and {len(data_dict['negative'])} negative.")
+            n_negative, n_positive = data_utils.get_balance_data_sizes(
+                len(data_dict['negative']),
+                len(data_dict['positive']),
+                desired_balance=params['min_balance'],
+                max_upsampling=params['max_upsampling'])
 
-        # actualy sample it
-        desired_balance_dict = {'negative': n_negative, 'positive': n_positive}
-        for class_, n_class in desired_balance_dict.items():
-            if n_class < len(data_dict[class_]):
-                # we can just select the first n since its already shuffled for downsampling
-                data_dict[class_] = data_dict[class_].select(range(n_negative))
-            elif n_class > len(data_dict[class_]):
-                # sample with replacement to upsample
-                indexes = np.random.randint(0, len(data_dict[class_]), size=n_class)
-                data_dict[class_] = data_dict[class_].select(indexes)
-            else:
-                pass
-        logger.info(f"Final negative, positive class training sizes: {len(data_dict['negative'])}, {len(data_dict['positive'])}")
-        # stick the data back together
-        data_dict['train'] = datasets.concatenate_datasets([data_dict['positive'], data_dict['negative']]).shuffle()
-        # drop the datasets from processing
-        _ = data_dict.pop('positive')
-        _.cleanup_cache_files()
-        del(_)
-        _ = data_dict.pop('negative')
-        _.cleanup_cache_files()
-        del(_)
+            # actualy sample it
+            desired_balance_dict = {'negative': n_negative, 'positive': n_positive}
+            for class_, n_class in desired_balance_dict.items():
+                if n_class < len(data_dict[class_]):
+                    # we can just select the first n since its already shuffled for downsampling
+                    data_dict[class_] = data_dict[class_].select(range(n_negative))
+                elif n_class > len(data_dict[class_]):
+                    # sample with replacement to upsample
+                    indexes = np.random.randint(0, len(data_dict[class_]), size=n_class)
+                    data_dict[class_] = data_dict[class_].select(indexes)
+                else:
+                    pass
+            logger.info(f"Final negative, positive class {part} sizes: {len(data_dict['negative'])}, {len(data_dict['positive'])}")
+            # stick the data back together
+            data_dict[part] = datasets.concatenate_datasets([data_dict['positive'], data_dict['negative']]).shuffle()
+            # drop the datasets from processing
+            _ = data_dict.pop('positive')
+            _.cleanup_cache_files()
+            del(_)
+            _ = data_dict.pop('negative')
+            _.cleanup_cache_files()
+            del(_)
 
     # remove unnecessary columns
     if not params['dev_keep_columns']:
