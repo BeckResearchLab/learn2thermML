@@ -6,12 +6,14 @@ Parameters:
   - taxa_id: keeps proteins from a particular organism together
   - int: clusters taxa by taxonomy of a particular level, 1 is kingdom, 2 is phylum, etc. Note that this may have errors, as it is based on taxonomy specified in NCBI which sometimes has ambiquity
 - `ogt_window`: (float, float), low and high temparature of window between OGT classes
-- `max_protein_len`: int, maximum protein length to consider
+- `max/min_protein_len`: int, maximum and minumum protein length to consider
 - `min_balance`: float or None, minimum balance of classes. class weighted training is always used, but this can be used to speicify downsampling of the 
     majority class in order to meet a minimum imbalance
 - `max_upsampling`: float, maximum fraction of original minority class to insert into the dataset
     ignored if `min_balance` is None
 - `data_batch_size`: int, batch size for data processing steps
+- `dev_keep_columns`: bool, keep datra columns not needed for ML in the HF dataset
+- `dev_sample_init_data`: bool, work with a small test sample or not
 """
 import os
 from yaml import safe_load as yaml_load
@@ -95,6 +97,7 @@ if __name__ == '__main__':
         FROM proteins
         INNER JOIN taxa ON (proteins.taxa_index=taxa.taxa_index)
         WHERE proteins.protein_len<{params['max_protein_len']}
+        AND proteins.protein_len>{params['min_protein_len']}
         AND taxa.ogt IS NOT NULL"""
     if params['dev_sample_init_data']:
         select_statement = select_statement + " USING SAMPLE 100000"
