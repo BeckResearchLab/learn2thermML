@@ -243,14 +243,15 @@ if __name__ == '__main__':
             f1=evaluate.load('f1')
             acc=evaluate.load('accuracy')
             matt=evaluate.load('matthews_correlation')
+            cfm = evaluate.load("BucketHeadP65/confusion_matrix")
 
             logits, labels = eval_pred
             predictions = np.argmax(logits, axis=-1)
             f1_val = f1.compute(predictions=predictions, references=labels)['f1']
             acc_val = acc.compute(predictions=predictions, references=labels)['accuracy']
             matt_val = matt.compute(predictions=predictions, references=labels)['matthews_correlation']
-
-            return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val}
+            cfm_val = cfm.compute(predictions=predictions, references=labels)['confusion_matrix']
+            return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val, 'cfm': cfm_val}
         
         # set up a dvccallback
         dvc_callback = model_utils.DVCLiveCallback(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False, report='md')
