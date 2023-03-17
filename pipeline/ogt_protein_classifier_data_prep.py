@@ -16,6 +16,7 @@ Parameters:
 - `dev_sample_init_data`: bool, work with a small test sample or not
 """
 import os
+import time
 from yaml import safe_load as yaml_load
 from yaml import dump as yaml_dump
 import pandas as pd
@@ -55,9 +56,9 @@ if __name__ == '__main__':
     utils_logger = logging.getLogger('l2tml_utils')
     utils_logger.setLevel(getattr(logging, LOGLEVEL))
     utils_logger.addHandler(fh)
-    datasets_logger = logging.getLogger('datasets')
-    datasets_logger.setLevel(getattr(logging, LOGLEVEL))
-    datasets_logger.addHandler(fh)
+    #datasets_logger = logging.getLogger('datasets')
+    #datasets_logger.setLevel(getattr(logging, LOGLEVEL))
+    #datasets_logger.addHandler(fh)
     
     # create dirs
     if not os.path.exists('./data/ogt_protein_classifier/data'):
@@ -125,6 +126,42 @@ if __name__ == '__main__':
     logger.info(f'Removed examples within window, {len(ds)} datapoints remaining')
     total_positives = ds.map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params, remove_columns=ds.column_names, desc="Counting total number of positives")
     logger.info(f'Initial dataset balance: {sum(total_positives["sum"])/len(ds)}')
+
+    # class balancing
+    if params['min_balance'] is not None:
+        # split the train into positive and negative
+        logger.info(f"Beginning balancing")
+        positives = ds.filter(lambda e: list(np.isclose(e['labels'], 1)), **ds_batch_params, desc="Splitting out positives for balancing")
+        positives = positives.shuffle()
+        negatives = ds.filter(lambda e: list(np.isclose(e['labels'], 0)), **ds_batch_params, desc="Splitting our negatives for balancing")
+        negatives = negatives.shuffle()
+        # get the suggested class data sizes
+        logger.info(f"Conducting balancing on data with {len(positives)} positives and {len(negatives)} negative.")
+        n_negative, n_positive = data_utils.get_balance_data_sizes(
+            len(negatives),
+            len(positives),
+            desired_balance=params['min_balance'],
+            max_upsampling=params['max_upsampling'])
+
+        # actualy sample it
+        data_dict = {'negative': negatives, 'positive': positives}
+        desired_balance_dict = {f'negative': n_negative, f'positive': n_positive}
+        for class_, n_class in desired_balance_dict.items():
+            if n_class < len(data_dict[class_]):
+                # we can just select the first n since its already shuffled for downsampling
+                data_dict[class_] = data_dict[class_].select(range(n_class))
+            elif n_class > len(data_dict[class_]):
+                # sample with replacement to upsample
+                indexes = np.random.randint(0, len(data_dict[class_]), size=n_class)
+                data_dict[class_] = data_dict[class_].select(indexes)
+            else:
+                pass
+        positives = data_dict['positive']; negatives = data_dict['negative']
+        logger.info(f"Final negative, positive classsizes: {len(positives)}, {len(negatives)}")
+        # stick the data back together
+        print(positives)
+        ds = datasets.concatenate_datasets([positives, negatives]).shuffle()
+
     
     # split the data
     splitter = data_utils.DataSplitter(ds)
@@ -133,47 +170,11 @@ if __name__ == '__main__':
     logger.info(f"Split data into train and test")
     train_positives = data_dict['train'].map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params, remove_columns=data_dict['train'].column_names, desc="Counting train positives")
     test_positives = data_dict['test'].map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params, remove_columns=data_dict['test'].column_names, desc="Counting test positives")
-    logger.info(f"Train balance: {sum(train_positives['sum'])/len(data_dict['train'])}")
-    logger.info(f"Test balance: {sum(test_positives['sum'])/len(data_dict['test'])}")
+    train_balance = sum(train_positives['sum'])/len(data_dict['train'])
+    test_balance = sum(test_positives['sum'])/len(data_dict['test'])
+    logger.info(f"Train balance: {train_balance}")
+    logger.info(f"Test balance: {test_balance}")
     
-    # class balancing
-    if params['min_balance'] is not None:
-        # split the train into positive and negative
-        for part in ['train', 'test']:
-            data_dict['positive'] = data_dict[part].filter(lambda e: list(np.isclose(e['labels'], 1)), **ds_batch_params, desc="Splitting out positives for balancing")
-            data_dict['positive'] = data_dict['positive'].shuffle()
-            data_dict['negative'] = data_dict[part].filter(lambda e: list(np.isclose(e['labels'], 0)), **ds_batch_params, desc="Splitting our negatives for balancing")
-            data_dict['negative'] = data_dict['negative'].shuffle()
-            # get the suggested class data sizes
-            logger.info(f"Conducting balancing for {part} data with {len(data_dict['positive'])} positive and {len(data_dict['negative'])} negative.")
-            n_negative, n_positive = data_utils.get_balance_data_sizes(
-                len(data_dict['negative']),
-                len(data_dict['positive']),
-                desired_balance=params['min_balance'],
-                max_upsampling=params['max_upsampling'])
-
-            # actualy sample it
-            desired_balance_dict = {'negative': n_negative, 'positive': n_positive}
-            for class_, n_class in desired_balance_dict.items():
-                if n_class < len(data_dict[class_]):
-                    # we can just select the first n since its already shuffled for downsampling
-                    data_dict[class_] = data_dict[class_].select(range(n_negative))
-                elif n_class > len(data_dict[class_]):
-                    # sample with replacement to upsample
-                    indexes = np.random.randint(0, len(data_dict[class_]), size=n_class)
-                    data_dict[class_] = data_dict[class_].select(indexes)
-                else:
-                    pass
-            logger.info(f"Final negative, positive class {part} sizes: {len(data_dict['negative'])}, {len(data_dict['positive'])}")
-            # stick the data back together
-            data_dict[part] = datasets.concatenate_datasets([data_dict['positive'], data_dict['negative']]).shuffle()
-            # drop the datasets from processing
-            _ = data_dict.pop('positive')
-            _.cleanup_cache_files()
-            del(_)
-            _ = data_dict.pop('negative')
-            _.cleanup_cache_files()
-            del(_)
 
     # remove unnecessary columns
     if not params['dev_keep_columns']:
@@ -186,7 +187,7 @@ if __name__ == '__main__':
     # get co2
     co2 = data_tracker.stop()
 
-    metrics = {'ogt_cfr_data_co2': co2, 'ogt_cfr_data_n_train': len(data_dict['train']), 'ogt_cfr_data_n_test': len(data_dict['test'])}
+    metrics = {'ogt_cfr_data_co2': co2, 'ogt_cfr_data_n_train': len(data_dict['train']), 'ogt_cfr_data_n_test': len(data_dict['test']), 'ogt_cfr_bal_train': train_balance, 'ogt_cfr_bal_test': test_balance}
 
     # save metrics
     with open('./data/ogt_protein_classifier/data_metrics.yaml', "w") as stream:
