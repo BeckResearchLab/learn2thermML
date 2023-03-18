@@ -104,6 +104,10 @@ if __name__ == '__main__':
     data_dict = datasets.load_from_disk('./data/ogt_protein_classifier/data')
     logger.info(f"Loaded data: {data_dict}")
 
+    # drop spurious columns
+    bad_columns = [c for c in data_dict['train'].column_names if c not in ['protein_seq', 'labels']]
+    data_dict = data_dict.remove_columns(bad_columns)
+
     # DEV OPTION IGNORE FOR NORMAL OPERATION
     ########################################
     # cut training data to a single batch to check if we can overfit
