@@ -69,8 +69,13 @@ if __name__ == '__main__':
     # get process rank
     # this is expected by pytorch to run distributed https://pytorch.org/docs/stable/elastic/run.html
     local_rank = int(os.environ["LOCAL_RANK"])
-    # set process rank
-    torch.cuda.set_device(local_rank)
+    if local_rank == -1:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        n_gpu = torch.cuda.device_count()
+    else:  # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
+        torch.cuda.set_device(local_rank)
+        device = torch.device("cuda", local_rank)
+        torch.distributed.init_process_group(backend="nccl")
 
     # load parameters
     with open("./params.yaml", "r") as stream:
@@ -134,7 +139,7 @@ if __name__ == '__main__':
     train_positives = sum(train_positives['sum'])
     positive_balance = train_positives/len(data_dict['train'])
     class_weight = [positive_balance/(1-positive_balance), 1.0]
-    class_weight=torch.tensor(class_weight, dtype=torch.float).cuda()
+    class_weight=torch.tensor(class_weight, dtype=torch.float).to(device)
     logger.info(f"Weights for class balancing: {class_weight}")
     
     # data format
@@ -279,7 +284,7 @@ if __name__ == '__main__':
     dvc_callback = model_utils.DVCLiveCallback(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False, report='md')
 
     # send model to device and go
-    model.cuda()
+    model.to(device)
     logger.info(f"Model ready for training: {model}")
     trainer = ImbalanceTrainer(
         class_weights=class_weight,
