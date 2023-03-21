@@ -67,12 +67,10 @@ class ImbalanceTrainer(transformers.Trainer):
 if __name__ == '__main__':
 
     # get process rank
-    # this is expected by pytorch to run distributed https://github.com/pytorch/pytorch/blob/master/torch/distributed/launch.py
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--local-rank", type=int)
-    args = parser.parse_args()
+    # this is expected by pytorch to run distributed https://pytorch.org/docs/stable/elastic/run.html
+    local_rank = int(os.environ["LOCAL_RANK"])
     # set process rank
-    torch.cuda.set_device(args.local_rank)
+    torch.cuda.set_device(local_rank)
 
     # load parameters
     with open("./params.yaml", "r") as stream:
@@ -82,7 +80,7 @@ if __name__ == '__main__':
     ds_batch_params = dict(batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
 
     # prepare the main process
-    if args.local_rank not in [-1, 0]:
+    if local_rank not in [-1, 0]:
         torch.distributed.barrier() # non main processes will stop here until the main process co
     else: # only main processes will run here
         logger.setLevel(getattr(logging, LOGLEVEL))
@@ -223,7 +221,7 @@ if __name__ == '__main__':
         raise NotImplementedError(f"Model type {params['model']} not available") 
 
     # allow main process to barrier out so the other processes can catch up
-    if args.local_rank == 0:
+    if local_rank == 0:
         torch.distributed.barrier() 
 
     # compute the saving and evaluation timeframe
@@ -307,7 +305,7 @@ if __name__ == '__main__':
     logger.info(f"Evaluation results: {eval_result}")
 
     # only main process records results
-    if args.local_rank == 0:
+    if local_rank == 0:
         # save model
         model.save_pretrained('./data/ogt_protein_classifier/model')
 
