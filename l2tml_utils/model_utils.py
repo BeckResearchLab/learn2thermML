@@ -93,7 +93,10 @@ class DVCLiveCallback(transformers.TrainerCallback):
     ):
         metrics = kwargs.get('metrics')
         for key, value in metrics.items():
-            self.live.log_metric(standardize_metric_name(key, __name__), value)
+            try:
+                self.live.log_metric(standardize_metric_name(key, __name__), value)
+            except:
+                pass # some things floating in the logs may not be recordable by dvc
         # if not already going to save, make sure it does
         # on_save above will be called and next step starts
         control.should_save=True
