@@ -15,6 +15,7 @@ Parameters:
 - `grad_accum`: int, number of gradients to accumulate before backprop
 - `dev_overtrain_one_batch`: bool, whether to make the whole dataset a single batch
 """
+import argparse
 import os
 from yaml import safe_load as yaml_load
 from yaml import dump as yaml_dump
@@ -64,27 +65,14 @@ class ImbalanceTrainer(transformers.Trainer):
         return (loss, outputs) if return_outputs else loss
 
 if __name__ == '__main__':
-    # start logger
-    logger.setLevel(getattr(logging, LOGLEVEL))
-    fh = logging.FileHandler(LOGFILE, mode='w')
-    formatter = logging.Formatter('%(filename)-12s %(asctime)s;%(funcName)-12s: %(levelname)-8s %(message)s')
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-    transformers_logger = logging.getLogger('transformers')
-    transformers_logger.setLevel(getattr(logging, LOGLEVEL))
-    transformers_logger.addHandler(fh)
-    utils_logger = logging.getLogger('l2tml_utils')
-    utils_logger.setLevel(getattr(logging, LOGLEVEL))
-    utils_logger.addHandler(fh)
-    
-    # create dirs
-    if not os.path.exists('./data/ogt_protein_classifier/model'):
-        os.mkdir('./data/ogt_protein_classifier/model')
 
-    # get device
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    logger.info(f'Using device {device} for ML')
-    logger.info(f'Using {CPU_COUNT} cpus for multiprocessing')
+    # get process rank
+    # this is expected by pytorch to run distributed https://github.com/pytorch/pytorch/blob/master/torch/distributed/launch.py
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--local-rank", type=int)
+    args = parser.parse_args()
+    # set process rank
+    torch.cuda.set_device(args.local_rank)
 
     # load parameters
     with open("./params.yaml", "r") as stream:
@@ -92,13 +80,39 @@ if __name__ == '__main__':
     params['_data_batch_size'] = int(params['batch_size']/CPU_COUNT)
     logger.info(f"Loaded parameters: {params}")
     ds_batch_params = dict(batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
+
+    # prepare the main process
+    if args.local_rank not in [-1, 0]:
+        torch.distributed.barrier() # non main processes will stop here until the main process co
+    else: # only main processes will run here
+        logger.setLevel(getattr(logging, LOGLEVEL))
+        fh = logging.FileHandler(LOGFILE, mode='w')
+        formatter = logging.Formatter('%(filename)-12s %(asctime)s;%(funcName)-12s: %(levelname)-8s %(message)s')
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+        transformers_logger = logging.getLogger('transformers')
+        transformers_logger.setLevel(getattr(logging, LOGLEVEL))
+        transformers_logger.addHandler(fh)
+        utils_logger = logging.getLogger('l2tml_utils')
+        utils_logger.setLevel(getattr(logging, LOGLEVEL))
+        utils_logger.addHandler(fh)
     
-    # start carbon tracker for data processing
-    tracker = codecarbon.EmissionsTracker( 
-        project_name="model_train",
-        output_dir="./data/ogt_protein_classifier/model",
-    )
-    tracker.start()
+        # create dirs
+        if not os.path.exists('./data/ogt_protein_classifier/model'):
+            os.mkdir('./data/ogt_protein_classifier/model')
+
+        # start carbon tracker for data processing
+        tracker = codecarbon.EmissionsTracker( 
+            project_name="model_train",
+            output_dir="./data/ogt_protein_classifier/model",
+        )
+        tracker.start()
+
+    # all processes will run here, but the main process will run first
+    # so the others can just use the cache
+
+    # get devices
+    logger.info(f'Using {CPU_COUNT} cpus for multiprocessing')
 
     # get the data
     data_dict = datasets.load_from_disk('./data/ogt_protein_classifier/data')
@@ -122,10 +136,10 @@ if __name__ == '__main__':
     train_positives = sum(train_positives['sum'])
     positive_balance = train_positives/len(data_dict['train'])
     class_weight = [positive_balance/(1-positive_balance), 1.0]
-    class_weight=torch.tensor(class_weight, dtype=torch.float).to(device)
+    class_weight=torch.tensor(class_weight, dtype=torch.float).cuda()
     logger.info(f"Weights for class balancing: {class_weight}")
     
-    # sending data
+    # data format
     data_dict = data_dict.with_format("torch")
  
     # initialize the model
@@ -205,87 +219,95 @@ if __name__ == '__main__':
             if param.requires_grad:
                 trainable_params += num
         logger.info(f'{total_params} total params, {trainable_params} trainable.')
-        
-        # compute the saving and evaluation timeframe
-        n_steps_per_epoch = int(len(data_dict['train']) / params['batch_size'])
-        if params['grad_accum']:
-            n_steps_per_epoch = int(n_steps_per_epoch/params['grad_accum'])
-        if params['n_save_per_epoch'] == 0:
-            n_steps_per_save = None
-            save_strategy = 'no'
-        else:
-            save_strategy = 'steps'
-            n_steps_per_save = int(n_steps_per_epoch/params['n_save_per_epoch'])
-        logger.info(f"Saving/evaluating every {n_steps_per_save} batches of size {params['batch_size']}")
+    else:
+        raise NotImplementedError(f"Model type {params['model']} not available") 
 
-        # ready the train
-        training_args = transformers.TrainingArguments(
-            do_train=True,
-            do_eval=True,
-            optim='adamw_hf',
-            optim_args=None,
-            learning_rate=float(params['lr']),
-            lr_scheduler_type=params['lr_scheduler'],
-            num_train_epochs=params['epochs'],
-            per_device_train_batch_size=params['batch_size'],
-            per_device_eval_batch_size=params['batch_size'],
-            gradient_accumulation_steps=params['grad_accum'],
-            eval_accumulation_steps=params['grad_accum'],
-            gradient_checkpointing=params['grad_checkpointing'],
-            fp16=params['fp16'],
-            log_level='info',
-            logging_strategy='steps',
-            logging_steps=1,
-            save_strategy=save_strategy,
-            save_steps=n_steps_per_save,
-            evaluation_strategy=save_strategy,
-            eval_steps=n_steps_per_save,
-            output_dir='./data/ogt_protein_classifier/model',
-            load_best_model_at_end=True
-        )
-        def compute_metrics(eval_pred):
-            f1=evaluate.load('f1')
-            acc=evaluate.load('accuracy')
-            matt=evaluate.load('matthews_correlation')
-            cfm = evaluate.load("BucketHeadP65/confusion_matrix")
+    # allow main process to barrier out so the other processes can catch up
+    if args.local_rank == 0:
+        torch.distributed.barrier() 
 
-            logits, labels = eval_pred
-            predictions = np.argmax(logits, axis=-1)
-            f1_val = f1.compute(predictions=predictions, references=labels)['f1']
-            acc_val = acc.compute(predictions=predictions, references=labels)['accuracy']
-            matt_val = matt.compute(predictions=predictions, references=labels)['matthews_correlation']
-            cfm_val = cfm.compute(predictions=predictions, references=labels)['confusion_matrix']
-            return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val, 'cfm': cfm_val}
-        
-        # set up a dvccallback
-        dvc_callback = model_utils.DVCLiveCallback(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False, report='md')
+    # compute the saving and evaluation timeframe
+    n_steps_per_epoch = int(len(data_dict['train']) / params['batch_size'])
+    if params['grad_accum']:
+        n_steps_per_epoch = int(n_steps_per_epoch/params['grad_accum'])
+    if params['n_save_per_epoch'] == 0:
+        n_steps_per_save = None
+        save_strategy = 'no'
+    else:
+        save_strategy = 'steps'
+        n_steps_per_save = int(n_steps_per_epoch/params['n_save_per_epoch'])
+    logger.info(f"Saving/evaluating every {n_steps_per_save} batches of size {params['batch_size']}")
+    
+    # ready the train
+    training_args = transformers.TrainingArguments(
+        do_train=True,
+        do_eval=True,
+        optim='adamw_hf',
+        optim_args=None,
+        learning_rate=float(params['lr']),
+        lr_scheduler_type=params['lr_scheduler'],
+        num_train_epochs=params['epochs'],
+        per_device_train_batch_size=params['batch_size'],
+        per_device_eval_batch_size=params['batch_size'],
+        gradient_accumulation_steps=params['grad_accum'],
+        eval_accumulation_steps=params['grad_accum'],
+        gradient_checkpointing=params['grad_checkpointing'],
+        fp16=params['fp16'],
+        log_level='info',
+        logging_strategy='steps',
+        logging_steps=1,
+        save_strategy=save_strategy,
+        save_steps=n_steps_per_save,
+        evaluation_strategy=save_strategy,
+        eval_steps=n_steps_per_save,
+        output_dir='./data/ogt_protein_classifier/model',
+        load_best_model_at_end=True
+    )
+    def compute_metrics(eval_pred):
+        f1=evaluate.load('f1')
+        acc=evaluate.load('accuracy')
+        matt=evaluate.load('matthews_correlation')
+        cfm = evaluate.load("BucketHeadP65/confusion_matrix")
 
-        # send model to device and go
-        model.to(device)
-        logger.info(f"Model ready for training: {model}")
-        trainer = ImbalanceTrainer(
-            class_weights=class_weight,
-            model=model,
-            args=training_args,
-            train_dataset=data_dict['train'],
-            eval_dataset=data_dict['test'],
-            compute_metrics=compute_metrics,
-            callbacks=[dvc_callback]
-        )
-        logger.info(f"Training parameters ready: {training_args}, beginning.")
-        
-        # remove the codecarbon callback, doing this manually
-        trainer.remove_callback(transformers.integrations.CodeCarbonCallback)
+        logits, labels = eval_pred
+        predictions = np.argmax(logits, axis=-1)
+        f1_val = f1.compute(predictions=predictions, references=labels)['f1']
+        acc_val = acc.compute(predictions=predictions, references=labels)['accuracy']
+        matt_val = matt.compute(predictions=predictions, references=labels)['matthews_correlation']
+        cfm_val = cfm.compute(predictions=predictions, references=labels)['confusion_matrix']
+        return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val, 'cfm': cfm_val}
+    
+    # set up a dvccallback
+    dvc_callback = model_utils.DVCLiveCallback(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False, report='md')
 
-        # run it!
-        training_results = trainer.train()
-        logger.info(f"Training results: {training_results}")
-        training_log = pd.DataFrame(trainer.state.log_history[:-1]).to_dict(orient='list')
+    # send model to device and go
+    model.cuda()
+    logger.info(f"Model ready for training: {model}")
+    trainer = ImbalanceTrainer(
+        class_weights=class_weight,
+        model=model,
+        args=training_args,
+        train_dataset=data_dict['train'],
+        eval_dataset=data_dict['test'],
+        compute_metrics=compute_metrics,
+        callbacks=[dvc_callback]
+    )
+    logger.info(f"Training parameters ready: {training_args}, beginning.")
+    
+    # remove the codecarbon callback, doing this manually
+    trainer.remove_callback(transformers.integrations.CodeCarbonCallback)
 
-        # test it
-        eval_result = trainer.evaluate()
-        logger.info(f"Evaluation results: {eval_result}")
-        
+    # run it!
+    training_results = trainer.train()
+    logger.info(f"Training results: {training_results}")
+    training_log = pd.DataFrame(trainer.state.log_history[:-1]).to_dict(orient='list')
+
+    # test it
+    eval_result = trainer.evaluate()
+    logger.info(f"Evaluation results: {eval_result}")
+
+    # only main process records results
+    if args.local_rank == 0:
         # save model
         model.save_pretrained('./data/ogt_protein_classifier/model')
 
@@ -297,9 +319,6 @@ if __name__ == '__main__':
         metrics['emissions'] = emissions
         metrics = {'ogt_cfr_model_'+k: v for k, v in metrics.items()}
 
-    else:
-        raise NotImplementedError(f"Model type {params['model']} not available")
-
-    # save metrics
-    with open('./data/ogt_protein_classifier/model_metrics.yaml', "w") as stream:
-        yaml_dump(metrics, stream)
+        # save metrics
+        with open('./data/ogt_protein_classifier/model_metrics.yaml', "w") as stream:
+            yaml_dump(metrics, stream)
