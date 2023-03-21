@@ -79,7 +79,10 @@ class DVCLiveCallback(transformers.TrainerCallback):
         logs = kwargs["logs"]
         if control.should_evaluate:
             for key, value in logs.items():
-                self.live.log_metric(standardize_metric_name(key, __name__), value)
+                try:
+                    self.live.log_metric(standardize_metric_name(key, __name__), value)
+                except:
+                    pass # some things floating in the logs may not be recordable by dvc
 
     def on_evaluate(
         self,
