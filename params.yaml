@@ -14,13 +14,13 @@ ogt_protein_classifier_data_prep:
 ogt_protein_classifier_train_evaluate:
   model: protbert
   protocol: finetune
-  dropout: 0.15
-  batch_size: 50
-  epochs: 5
+  dropout: 0.0
+  batch_size: 20
+  epochs: 100
   lr: 5e-5
   lr_scheduler: linear
-  n_save_per_epoch: 4
-  grad_checkpointing: true
-  grad_accum: 10
+  n_save_per_epoch: 0
+  grad_checkpointing: false
+  grad_accum: false
   fp16: true
   dev_overtrain_one_batch: true
