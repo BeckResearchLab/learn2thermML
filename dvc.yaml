@@ -20,7 +20,7 @@ stages:
     - ./data/ogt_protein_classifier/data_metrics.yaml:
         cache: false
   ogt_protein_classifier_train_evaluate:
-    cmd: python pipeline/ogt_protein_classifier_train_evaluate.py
+    cmd: torchrun --n_proc_per_node gpu pipeline/ogt_protein_classifier_train_evaluate.py
     deps:
     - ./pipeline/ogt_protein_classifier_train_evaluate.py
     - ./l2tml_utils/model_utils.py
