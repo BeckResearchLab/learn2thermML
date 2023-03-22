@@ -107,5 +107,8 @@ class DVCLiveCallback(transformers.TrainerCallback):
         state: transformers.TrainerState,
         control: transformers.TrainerControl,
         **kwargs
-    ):
-        self.live.end()
+    ):  
+        try:
+            self.live.end()
+        except:
+            pass
