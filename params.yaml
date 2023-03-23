@@ -23,4 +23,4 @@ ogt_protein_classifier_train_evaluate:
   grad_checkpointing: true
   grad_accum: 1
   fp16: true
-  dev_subsample_data: 40
+  dev_subsample_data: 80
