@@ -16,7 +16,7 @@ ogt_protein_classifier_train_evaluate:
   protocol: finetune
   dropout: 0.0
   batch_size: 20
-  epochs: 25
+  epochs: 50
   lr: 5e-5
   lr_scheduler: linear
   n_save_per_epoch: 0
