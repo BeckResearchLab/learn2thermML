@@ -259,7 +259,7 @@ if __name__ == '__main__':
         eval_accumulation_steps=params['grad_accum'],
         gradient_checkpointing=params['grad_checkpointing'],
         fp16=params['fp16'],
-        log_level='info',
+        log_level='INFO',
         logging_strategy='steps',
         logging_steps=1,
         save_strategy=save_strategy,
@@ -313,7 +313,7 @@ if __name__ == '__main__':
     logger.info(f"Evaluation results: {eval_result}")
 
     # only main process records results
-    if local_rank == 0:
+    if local_rank in [-1, 0]:
         # save model
         model.save_pretrained('./data/ogt_protein_classifier/model')
 
