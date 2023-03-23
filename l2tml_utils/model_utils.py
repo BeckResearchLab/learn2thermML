@@ -80,11 +80,12 @@ class DVCLiveCallback(transformers.TrainerCallback):
         # this only occurs when an evaluation step is necessary
         # logs are not available in the on_evaluate event
         logs = kwargs["logs"]
-        for key, value in logs.items():
-            try:
-                self.live.log_metric(standardize_metric_name(key, __name__), value)
-            except:
-                pass # some things floating in the logs may not be recordable by dvc
+        if control.should_evaluate:
+            for key, value in logs.items():
+                try:
+                    self.live.log_metric(standardize_metric_name(key, __name__), value)
+                except:
+                    pass # some things floating in the logs may not be recordable by dvc
 
     def on_evaluate(
         self,
