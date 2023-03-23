@@ -30,6 +30,7 @@ stages:
         checkpoint: true
     - ./data/ogt_protein_classifier/dvclive/report.md:
         cache: false
+        persist: true
     params:
     - ogt_protein_classifier_train_evaluate.model
     - ogt_protein_classifier_train_evaluate.protocol
@@ -37,9 +38,12 @@ stages:
     - ogt_protein_classifier_train_evaluate.epochs
     - ogt_protein_classifier_train_evaluate.n_save_per_epoch
     - ogt_protein_classifier_train_evaluate.dropout
-    - ogt_protein_classifier_train_evaluate.dev_overtrain_one_batch
     - ogt_protein_classifier_train_evaluate.lr_scheduler
     - ogt_protein_classifier_train_evaluate.lr
+    - ogt_protein_classifier_train_evaluate.grad_accum
+    - ogt_protein_classifier_train_evaluate.grad_checkpointing
+    - ogt_protein_classifier_train_evaluate.fp16
+    - ogt_protein_classifier_train_evaluate.dev_subsample_data
     metrics:
     - ./data/ogt_protein_classifier/model_metrics.yaml:
         cache: false
