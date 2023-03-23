@@ -86,13 +86,14 @@ if __name__ == '__main__':
     logger.info(f"Loaded parameters: {params}")
     ds_batch_params = dict(batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
     
-    # start dvc live. if done later it breaks logs
-    live = dvclive.Live(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False, report='md')
 
     # prepare the main process
     if local_rank not in [-1, 0]:
         torch.distributed.barrier() # non main processes will stop here until the main process co
     else: # only main processes will run here
+        # start dvc live. if done later it breaks logs
+        live = dvclive.Live(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False, report='md')
+        # loggers
         logger.setLevel(getattr(logging, LOGLEVEL))
         fh = logging.FileHandler(LOGFILE, mode='w')
         formatter = logging.Formatter('%(filename)-12s %(asctime)s;%(funcName)-12s: %(levelname)-8s %(message)s')
@@ -286,7 +287,10 @@ if __name__ == '__main__':
         return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val, 'cfm': cfm_val}
     
     # set up a dvccallback
-    dvc_callback = model_utils.DVCLiveCallback(live)
+    if local_rank in [-1, 0]:
+        callbacks = [model_utils.DVCLiveCallback(live)]
+    else:
+        callbacks = None
 
     # send model to device and go
     model.to(device)
@@ -298,7 +302,7 @@ if __name__ == '__main__':
         train_dataset=data_dict['train'],
         eval_dataset=data_dict['test'],
         compute_metrics=compute_metrics,
-        callbacks=[dvc_callback]
+        callbacks=callbacks
     )
     logger.info(f"Training parameters ready: {training_args}, beginning.")
     
