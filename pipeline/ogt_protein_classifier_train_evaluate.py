@@ -13,7 +13,7 @@ Parameters:
 - `n_save_per_epoch`: int, number of times to evaluate and save model per training epoch. 1 is once at the end of the epoch.
 - `grad_checkpointing`: bool, whehert to train with grad checkpointing
 - `grad_accum`: int, number of gradients to accumulate before backprop
-- `dev_overtrain_one_batch`: bool, whether to make the whole dataset a single batch
+- `dev_subsample_data`: int, whether downsample the training data to a desired size
 """
 import argparse
 import os
@@ -128,10 +128,12 @@ if __name__ == '__main__':
     # DEV OPTION IGNORE FOR NORMAL OPERATION
     ########################################
     # cut training data to a single batch to check if we can overfit
-    if params["dev_overtrain_one_batch"]:
-        data_dict['train'] = data_dict['train'].select(range(params['batch_size']))
-        data_dict['test'] = data_dict['test'].select(range(params['batch_size']))
-        logger.info(f"Overfitting test on a single example...")
+    if params["dev_subsample_data"]:
+        if params["dev_subsample_data"] < len(data_dict['train']):
+            data_dict['train'] = data_dict['train'].select(range(params["dev_subsample_data"]))
+        if params["dev_subsample_data"] < len(data_dict['test']):
+            data_dict['test'] = data_dict['test'].select(range(params["dev_subsample_data"]))
+        logger.info(f"Downsample train and test, now sizes {(len(data_dict['train']),len(data_dict['test']))}")
     ########################################
 
     # class weighting for imbalance

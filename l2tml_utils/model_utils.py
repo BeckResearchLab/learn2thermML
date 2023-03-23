@@ -8,6 +8,9 @@ from dvclive.utils import standardize_metric_name
 
 from typing import Optional
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 class BertForSequenceClassificationBigHead(transformers.BertForSequenceClassification):
@@ -108,7 +111,5 @@ class DVCLiveCallback(transformers.TrainerCallback):
         control: transformers.TrainerControl,
         **kwargs
     ):  
-        try:
-            self.live.end()
-        except:
-            pass
+        self.live.end()
+
