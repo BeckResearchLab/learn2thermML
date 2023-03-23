@@ -204,6 +204,7 @@ if __name__ == '__main__':
         data_dict = data_dict.map(tokenizer_fn, **ds_batch_params, desc="Tokenizing data")
         data_dict = data_dict.remove_columns('protein_seq')
         logger.info(f'Tokenized dataset. {data_dict}')
+        logger.info(f"Dataset snippet: {data_dict['train'][:5]}")
 
         # fix the model if necessary
         if params['protocol'] in ['head', 'bighead']:
