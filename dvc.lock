@@ -4,9 +4,9 @@ stages:
     cmd: torchrun --nproc_per_node gpu pipeline/ogt_protein_classifier_train_evaluate.py
     deps:
     - path: ./data/ogt_protein_classifier/data
-      md5: 9c226bd553f35ceff63bc792c89efdcb.dir
-      size: 53651830
-      nfiles: 208
+      md5: 125519cd45c75f09ddd8b3391dfcf9d6.dir
+      size: 53478310
+      nfiles: 18
     - path: ./l2tml_utils/model_utils.py
       md5: 13c9597c906c8f2291cc7902be3c622d
       size: 4167
@@ -29,22 +29,22 @@ stages:
         ogt_protein_classifier_train_evaluate.protocol: finetune
     outs:
     - path: ./data/ogt_protein_classifier/dvclive/metrics.json
-      md5: 6166d2da8cba78baa4073ea06261d7ee
-      size: 328
+      md5: 77189bea227d762f4828039734404c42
+      size: 323
     - path: ./data/ogt_protein_classifier/dvclive/plots
-      md5: fedd9342eb2821cce825155877750f82.dir
-      size: 4070
+      md5: a8a53f613882fef1753097e0b682759c.dir
+      size: 6421
       nfiles: 10
     - path: ./data/ogt_protein_classifier/dvclive/report.md
-      md5: ef1710864671588792c3af3ae2dae19a
+      md5: d7e1bee596f236bf2aca039d5e84f5c8
       size: 1056
     - path: ./data/ogt_protein_classifier/model
-      md5: c2dd2db0c78f0c5168d131c0dc1c4287.dir
-      size: 80640262172
-      nfiles: 146
+      md5: bbdb0ffa8e45e62416ba2bfd7814154b.dir
+      size: 127680720499
+      nfiles: 231
     - path: ./data/ogt_protein_classifier/model_metrics.yaml
-      md5: 2ea2ffd8317776fe5510b5c77b378d0e
-      size: 8772
+      md5: 7de6df109ecaaab1f9e243aff317c1be
+      size: 13454
   ogt_protein_classifier_data_prep:
     cmd: python pipeline/ogt_protein_classifier_data_prep.py
     deps:

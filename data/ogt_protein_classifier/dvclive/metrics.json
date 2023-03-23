@@ -1,13 +1,13 @@
 {
-    "loss": 0.005,
-    "learning_rate": 1.8e-05,
-    "epoch": 32.0,
-    "eval_loss": 0.81995689868927,
-    "eval_f1": 0.8210526315789474,
-    "eval_accuracy": 0.7875,
-    "eval_matthew": 0.6202638734661827,
-    "eval_runtime": 3.2403,
-    "eval_samples_per_second": 24.689,
-    "eval_steps_per_second": 0.617,
-    "step": 15
+    "loss": 0.0037,
+    "learning_rate": 0.0,
+    "epoch": 50.0,
+    "eval_loss": 0.861707329750061,
+    "eval_f1": 0.8297872340425532,
+    "eval_accuracy": 0.8,
+    "eval_matthew": 0.6405126152203485,
+    "eval_runtime": 3.3522,
+    "eval_samples_per_second": 23.865,
+    "eval_steps_per_second": 0.597,
+    "step": 24
 }
