@@ -27,7 +27,9 @@ import datasets
 import transformers
 import torch
 import evaluate
+
 import codecarbon
+import dvclive
 
 if 'SLURM_CPUS_ON_NODE' in os.environ:
     CPU_COUNT = int(os.environ['SLURM_CPUS_ON_NODE'])
@@ -83,6 +85,9 @@ if __name__ == '__main__':
     params['_data_batch_size'] = int(params['batch_size']/CPU_COUNT)
     logger.info(f"Loaded parameters: {params}")
     ds_batch_params = dict(batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
+    
+    # start dvc live. if done later it breaks logs
+    live = dvclive.Live(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False, report='md')
 
     # prepare the main process
     if local_rank not in [-1, 0]:
@@ -256,7 +261,7 @@ if __name__ == '__main__':
         eval_accumulation_steps=params['grad_accum'],
         gradient_checkpointing=params['grad_checkpointing'],
         fp16=params['fp16'],
-        log_level='INFO',
+        log_level='info',
         logging_strategy='steps',
         logging_steps=1,
         save_strategy=save_strategy,
@@ -281,7 +286,7 @@ if __name__ == '__main__':
         return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val, 'cfm': cfm_val}
     
     # set up a dvccallback
-    dvc_callback = model_utils.DVCLiveCallback(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False, report='md')
+    dvc_callback = model_utils.DVCLiveCallback(live)
 
     # send model to device and go
     model.to(device)

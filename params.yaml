@@ -16,10 +16,10 @@ ogt_protein_classifier_train_evaluate:
   protocol: finetune
   dropout: 0.0
   batch_size: 20
-  epochs: 15
+  epochs: 25
   lr: 5e-5
   lr_scheduler: linear
-  n_save_per_epoch: .2
+  n_save_per_epoch: 0
   grad_checkpointing: true
   grad_accum: 1
   fp16: true
