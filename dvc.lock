@@ -8,8 +8,8 @@ stages:
       size: 53175798
       nfiles: 18
     - path: ./l2tml_utils/model_utils.py
-      md5: a72e1a70f1231e37f30ec5053c5871c8
-      size: 4111
+      md5: 13c9597c906c8f2291cc7902be3c622d
+      size: 4167
     - path: ./pipeline/ogt_protein_classifier_train_evaluate.py
       md5: a1f4f19ded183929cf9d94d2d639ab7f
       size: 14570
@@ -25,26 +25,26 @@ stages:
         ogt_protein_classifier_train_evaluate.lr: 5e-05
         ogt_protein_classifier_train_evaluate.lr_scheduler: linear
         ogt_protein_classifier_train_evaluate.model: protbert
-        ogt_protein_classifier_train_evaluate.n_save_per_epoch: 0
+        ogt_protein_classifier_train_evaluate.n_save_per_epoch: 1
         ogt_protein_classifier_train_evaluate.protocol: finetune
     outs:
     - path: ./data/ogt_protein_classifier/dvclive/metrics.json
-      md5: ee6847ce9b838b119b670763ae7c8e79
-      size: 251
+      md5: 6bf741a466dd313732e79c9b9b436026
+      size: 326
     - path: ./data/ogt_protein_classifier/dvclive/plots
-      md5: cc4fe09acf88df270159a0748d43087e.dir
-      size: 2131
-      nfiles: 15
+      md5: e50e49e74149f4c86979c3c34fbd3003.dir
+      size: 6326
+      nfiles: 10
     - path: ./data/ogt_protein_classifier/dvclive/report.md
-      md5: 0b1428221cdf0a4a823658879520fa20
-      size: 859
+      md5: 4ab4f0b33548480e4cded16a0d84a205
+      size: 1056
     - path: ./data/ogt_protein_classifier/model
-      md5: 0b01ccfbb02b8dc9b94396b75549c183.dir
-      size: 1680240018
-      nfiles: 6
+      md5: c85474816147d6baab296ef48e160356.dir
+      size: 127680639617
+      nfiles: 231
     - path: ./data/ogt_protein_classifier/model_metrics.yaml
-      md5: 497be72f1d5bcdc6bcca22b144b8bf2f
-      size: 2460
+      md5: 2ea2ffd8317776fe5510b5c77b378d0e
+      size: 8772
   ogt_protein_classifier_data_prep:
     cmd: python pipeline/ogt_protein_classifier_data_prep.py
     deps:

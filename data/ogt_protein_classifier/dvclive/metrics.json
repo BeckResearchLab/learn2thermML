@@ -1,10 +1,13 @@
 {
-    "loss": 0.0167,
+    "loss": 0.0376,
     "learning_rate": 0.0,
     "epoch": 50.0,
-    "train_runtime": 64.6768,
-    "train_samples_per_second": 30.923,
-    "train_steps_per_second": 0.773,
-    "total_flos": 2328209915904000.0,
-    "train_loss": 0.15937432520091532
+    "eval_loss": 1.6209005117416382,
+    "eval_f1": 0.6071428571428571,
+    "eval_accuracy": 0.45,
+    "eval_matthew": 0.13766648985981775,
+    "eval_runtime": 2.9522,
+    "eval_samples_per_second": 13.549,
+    "eval_steps_per_second": 0.339,
+    "step": 24
 }

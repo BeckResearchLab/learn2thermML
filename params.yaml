@@ -19,7 +19,7 @@ ogt_protein_classifier_train_evaluate:
   epochs: 50
   lr: 5e-5
   lr_scheduler: linear
-  n_save_per_epoch: 0
+  n_save_per_epoch: 1
   grad_checkpointing: true
   grad_accum: 1
   fp16: true
