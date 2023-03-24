@@ -4,9 +4,9 @@ stages:
     cmd: torchrun --nproc_per_node gpu pipeline/ogt_protein_classifier_train_evaluate.py
     deps:
     - path: ./data/ogt_protein_classifier/data
-      md5: 327b0d56f652dc40ada21858068d78e9.dir
-      size: 57719622
-      nfiles: 18
+      md5: c46d9ee483faaed0426a2d9219a24f1c.dir
+      size: 57800614
+      nfiles: 208
     - path: ./l2tml_utils/model_utils.py
       md5: 13c9597c906c8f2291cc7902be3c622d
       size: 4167
@@ -17,7 +17,7 @@ stages:
       params.yaml:
         ogt_protein_classifier_train_evaluate.batch_size: 20
         ogt_protein_classifier_train_evaluate.dev_subsample_data: 640
-        ogt_protein_classifier_train_evaluate.dropout: 0.0
+        ogt_protein_classifier_train_evaluate.dropout: 0.15
         ogt_protein_classifier_train_evaluate.epochs: 50
         ogt_protein_classifier_train_evaluate.fp16: true
         ogt_protein_classifier_train_evaluate.grad_accum: 16
@@ -29,22 +29,22 @@ stages:
         ogt_protein_classifier_train_evaluate.protocol: finetune
     outs:
     - path: ./data/ogt_protein_classifier/dvclive/metrics.json
-      md5: e6df79ad455556795f85884ee6dca09f
-      size: 329
+      md5: 5286b7b3be6f7b741c199a41b3530349
+      size: 349
     - path: ./data/ogt_protein_classifier/dvclive/plots
-      md5: 1aed7d52a2903d6b17440dadb18cb2ae.dir
-      size: 6653
+      md5: 08e16a76c613bc9099e396f5075a2577.dir
+      size: 6599
       nfiles: 10
     - path: ./data/ogt_protein_classifier/dvclive/report.md
-      md5: bc71f8cea1cec6b6f78e4ce86d05366b
+      md5: be1a07fa09f5cde326b53b2d4b15bd74
       size: 1056
     - path: ./data/ogt_protein_classifier/model
-      md5: fb4ba2e7ade29a6f72e16ae9fc5a9305.dir
-      size: 127680643684
+      md5: 9fcaa561ee516702b8c77a08f5f62ac0.dir
+      size: 124320891490
       nfiles: 231
     - path: ./data/ogt_protein_classifier/model_metrics.yaml
-      md5: ec977759d7b767cbe365af5679731e22
-      size: 9031
+      md5: 3566ef8b541753cf571c99151bf52c84
+      size: 8975
   ogt_protein_classifier_data_prep:
     cmd: python pipeline/ogt_protein_classifier_data_prep.py
     deps:
