@@ -21,6 +21,6 @@ ogt_protein_classifier_train_evaluate:
   lr_scheduler: linear
   n_save_per_epoch: 1
   grad_checkpointing: true
-  grad_accum: 8
+  grad_accum: 16
   fp16: true
-  dev_subsample_data: 320
+  dev_subsample_data: 640
