@@ -11,6 +11,7 @@ Parameters:
     majority class in order to meet a minimum imbalance
 - `max_upsampling`: float, maximum fraction of original minority class to insert into the dataset
     ignored if `min_balance` is None
+- `deduplication_jaccard`: None or float, if float, remove examples within the dataset with > the value in jaccard distance based on MinHash of k-gram protein representation. 
 - `data_batch_size`: int, batch size for data processing steps
 - `dev_keep_columns`: bool, keep datra columns not needed for ML in the HF dataset
 - `dev_sample_init_data`: bool, work with a small test sample or not
@@ -159,9 +160,23 @@ if __name__ == '__main__':
         positives = data_dict['positive']; negatives = data_dict['negative']
         logger.info(f"Final negative, positive classsizes: {len(positives)}, {len(negatives)}")
         # stick the data back together
-        print(positives)
         ds = datasets.concatenate_datasets([positives, negatives]).shuffle()
 
+    # deduplication
+    if params['deduplication']['do']:
+        logger.info("Deduplicating dataset...")
+        j_thresh = params['deduplication']['jaccard']
+        if not (j_thresh > 0.0 and j_thresh < 1.0):
+            raise ValueError('Jaccard threshold for deduplication must be in [0.0,1.0]')
+        import l2t_utils.dataset_deduplication
+        ds, _ = l2t_utils.dataset_deduplication.deduplicate_dataset(
+            ds,
+            jaccard_threshold=j_thresh,
+            num_perm=params['deduplication']['num_perm'],
+            k=params['deduplication']['kgram']
+        )
+    else:
+        pass
     
     # split the data
     splitter = data_utils.DataSplitter(ds)

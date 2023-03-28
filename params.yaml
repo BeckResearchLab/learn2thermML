@@ -6,6 +6,11 @@ ogt_protein_classifier_data_prep:
   max_protein_len: 250
   min_protein_len: 50
   train_test_frac: 0.1
+  deduplication: 
+    - do: True
+    - jaccard: 0.85
+    - kgram: 3
+    - num_perm: 100
   min_balance: 0.5
   max_upsampling: 0.0
   data_batch_size: 200
