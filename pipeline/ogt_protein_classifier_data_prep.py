@@ -11,7 +11,11 @@ Parameters:
     majority class in order to meet a minimum imbalance
 - `max_upsampling`: float, maximum fraction of original minority class to insert into the dataset
     ignored if `min_balance` is None
-- `deduplication_jaccard`: None or float, if float, remove examples within the dataset with > the value in jaccard distance based on MinHash of k-gram protein representation. 
+- `deduplication`: 
+   - `do`: bool, whether to do deduplication
+   - `num_perm`: int, number of MinHash permutations
+   - `kgram`: int, size of kgrams for protein representation
+   - `jaccard`: float remove examples within the dataset with > the value in jaccard distance based on MinHash of k-gram protein representation. 
 - `data_batch_size`: int, batch size for data processing steps
 - `dev_keep_columns`: bool, keep datra columns not needed for ML in the HF dataset
 - `dev_sample_init_data`: bool, work with a small test sample or not
@@ -72,6 +76,10 @@ if __name__ == '__main__':
     with open("./params.yaml", "r") as stream:
         params = yaml_load(stream)['ogt_protein_classifier_data_prep']
     logger.info(f"Loaded parameters: {params}")
+    dedup_dict = {}
+    for d in params['deduplication']:
+        dedup_dict.update(d)
+    params['deduplication'] = dedup_dict
     
     # set some kwargs for datasets batching
     ds_batch_params = dict(batched=True, batch_size=params['data_batch_size'], num_proc=CPU_COUNT)
@@ -168,8 +176,8 @@ if __name__ == '__main__':
         j_thresh = params['deduplication']['jaccard']
         if not (j_thresh > 0.0 and j_thresh < 1.0):
             raise ValueError('Jaccard threshold for deduplication must be in [0.0,1.0]')
-        import l2t_utils.dataset_deduplication
-        ds, _ = l2t_utils.dataset_deduplication.deduplicate_dataset(
+        import l2tml_utils.dataset_deduplication
+        ds, _ = l2tml_utils.dataset_deduplication.deduplicate_dataset(
             ds,
             jaccard_threshold=j_thresh,
             num_perm=params['deduplication']['num_perm'],

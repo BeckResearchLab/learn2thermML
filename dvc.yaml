@@ -13,6 +13,7 @@ stages:
       - ogt_protein_classifier_data_prep.max_protein_len
       - ogt_protein_classifier_data_prep.min_balance
       - ogt_protein_classifier_data_prep.max_upsampling
+      - ogt_protein_classifier_data_prep.deduplication
       - ogt_protein_classifier_data_prep.data_batch_size
       - ogt_protein_classifier_data_prep.dev_keep_columns
       - ogt_protein_classifier_data_prep.dev_sample_init_data

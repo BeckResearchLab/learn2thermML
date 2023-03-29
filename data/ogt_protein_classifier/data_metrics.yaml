@@ -1,5 +1,5 @@
-ogt_cfr_bal_test: 0.5033938437253355
-ogt_cfr_bal_train: 0.4996229018433961
-ogt_cfr_data_co2: 0.028818427677136566
-ogt_cfr_data_n_test: 19005
-ogt_cfr_data_n_train: 171043
+ogt_cfr_bal_test: 0.49552590687456466
+ogt_cfr_bal_train: 0.49178688163464573
+ogt_cfr_data_co2: 0.036592308845992155
+ogt_cfr_data_n_test: 18663
+ogt_cfr_data_n_train: 167963

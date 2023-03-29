@@ -25,7 +25,7 @@ from tqdm import tqdm
 
 from datasketch import MinHash, MinHashLSH
 from dpu_utils.utils.iterators import ThreadedIterator
-import ntlk
+import nltk
 
 import logging
 logger = logging.getLogger(__name__)
@@ -126,13 +126,21 @@ class DuplicationIndex:
         with open(filepath, "w") as f:
             json.dump(duplicate_clusters, f)
 
+def _compute_min_hash(ins):
+    e, k, num_perm = ins
+    index, data = e
+    min_hash = compute_min_hash(data['protein_seq'], k=k, num_perm=num_perm)
+    return index, min_hash
 
+def _dataset_iter(dataset, k, num_perm):
+    for e in dataset:
+        yield (e, k, num_perm)
 
-def minhash_iter(dataset_iterator: Type[Dataset]):
+def _minhash_iter(dataset_iterator: Type[Dataset], k, num_perm):
     with mp.Pool() as pool:
         for data in pool.imap_unordered(
             _compute_min_hash,
-            ThreadedIterator(dataset_iterator, max_queue_size=10000),
+            ThreadedIterator(_dataset_iter(dataset_iterator, k=k, num_perm=num_perm), max_queue_size=10000),
             chunksize=100,
         ):
             if data is not None:
@@ -140,7 +148,7 @@ def minhash_iter(dataset_iterator: Type[Dataset]):
 
 
 def make_duplicate_clusters(
-    dataset_iterator: Type[Dataset],
+    dataset: Type[Dataset],
     jaccard_threshold: float,
     num_perm: int=100,
     k: int = 3):
@@ -154,24 +162,9 @@ def make_duplicate_clusters(
     
     
     # prepare iterators
-    def _compute_min_hash(element):
-        index, data = element
-        min_hash = compute_min_hash(data['protein_seq'], k=k, num_perm=num_perm)
-        return index, min_hash
-    
-    for filename, min_hash in tqdm(ThreadedIterator(minhash_iter(enumerate(dataset_iterator)), max_queue_size=100)):
+    for filename, min_hash in tqdm(ThreadedIterator(_minhash_iter(enumerate(dataset), k=k, num_perm=num_perm), max_queue_size=100)):
         di.add(filename, min_hash)
     
-    def minhash_iter(dataset_iterator: Type[Dataset]):
-        with mp.Pool() as pool:
-            for data in pool.imap_unordered(
-                _compute_min_hash,
-                ThreadedIterator(dataset_iterator, max_queue_size=10000),
-                chunksize=100,
-            ):
-                if data is not None:
-                    yield data
-
     # Returns a List[Cluster] where Cluster is List[str] with the filenames.
     return di.get_duplicate_clusters()
 
@@ -231,7 +224,7 @@ def find_extremes(cluster_list, dataset, jaccard_threshold, k, num_perm):
     global _shared_dataset
     _shared_dataset = dataset
     extremes_list = []
-    f = partial(_find_cluster_extremes_shared, jaccard_threshold=jaccard_threshold, , k=k, num_perm=num_perm)
+    f = partial(_find_cluster_extremes_shared, jaccard_threshold=jaccard_threshold, k=k, num_perm=num_perm)
     with mp.Pool() as pool:
         for extremes in tqdm(
             pool.imap_unordered(
@@ -287,7 +280,7 @@ def deduplicate_dataset(
     duplicate_clusters = make_duplicate_clusters(dataset, jaccard_threshold)
     duplicate_indices = set(x["base_index"] for cluster in duplicate_clusters for x in cluster)
     extreme_dict = {}
-    extremes_clusters = find_extremes(duplicate_clusters, dataset, jaccard_threshold, , k=k, num_perm=num_perm)
+    extremes_clusters = find_extremes(duplicate_clusters, dataset, jaccard_threshold, k=k, num_perm=num_perm)
     for extremes in extremes_clusters:
         for element in extremes:
             extreme_dict[element["base_index"]] = element

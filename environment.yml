@@ -24,4 +24,7 @@ dependencies:
     - duckdb==0.7.0
     - codecarbon==2.1.4
     - dvclive==2.1.0
+    - datasketch
+    - dpu_utils
+    - nltk
 
