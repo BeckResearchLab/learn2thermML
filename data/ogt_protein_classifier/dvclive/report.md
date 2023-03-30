@@ -4,7 +4,7 @@ metrics.json
 
 |   loss |   learning_rate |   epoch |   eval_loss |   eval_f1 |   eval_accuracy |   eval_matthew |   eval_runtime |   eval_samples_per_second |   eval_steps_per_second |   step |
 |--------|-----------------|---------|-------------|-----------|-----------------|----------------|----------------|---------------------------|-------------------------|--------|
-| 0.2133 |     2.38095e-06 |    0.95 |    0.215999 |  0.909949 |        0.912072 |       0.824437 |        140.322 |                   133.002 |                   1.668 |      9 |
+| 0.2223 |     6.17284e-07 |    0.98 |    0.221578 |  0.906475 |        0.909327 |       0.818592 |        131.862 |                   136.999 |                   1.714 |      9 |
 
 ![static/eval_steps_per_second](static/eval_steps_per_second.png)
 

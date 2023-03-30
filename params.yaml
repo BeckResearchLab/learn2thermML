@@ -8,7 +8,7 @@ ogt_protein_classifier_data_prep:
   train_test_frac: 0.1
   deduplication: 
     - do: True
-    - jaccard: 0.85
+    - jaccard: 0.6
     - kgram: 3
     - num_perm: 100
   min_balance: 0.5

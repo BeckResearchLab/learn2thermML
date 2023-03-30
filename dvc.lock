@@ -4,8 +4,8 @@ stages:
     cmd: torchrun --nproc_per_node gpu pipeline/ogt_protein_classifier_train_evaluate.py
     deps:
     - path: ./data/ogt_protein_classifier/data
-      md5: d1a46094f60154aa1d0e11b5879f4fa5.dir
-      size: 734557696
+      md5: c5f4abdaefc74bdbb83fc88f4171b0a0.dir
+      size: 711110983
       nfiles: 18
     - path: ./l2tml_utils/model_utils.py
       md5: 13c9597c906c8f2291cc7902be3c622d
@@ -29,22 +29,22 @@ stages:
         ogt_protein_classifier_train_evaluate.protocol: finetune
     outs:
     - path: ./data/ogt_protein_classifier/dvclive/metrics.json
-      md5: de1ad50b8ea623f7c3c3eaf3ec28949f
-      size: 360
+      md5: d48778e602944635c4c7b73670320f58
+      size: 359
     - path: ./data/ogt_protein_classifier/dvclive/plots
-      md5: 2fb64ea83fe4524a9c1212febc1daa94.dir
-      size: 3100
+      md5: 7ecbc9ec8e360818d39e9ba7fb9e3e7c.dir
+      size: 3107
       nfiles: 10
     - path: ./data/ogt_protein_classifier/dvclive/report.md
-      md5: d9ceff125299369c1fdd38c91914f67c
+      md5: eadf335f91566e5d0226c4426d867311
       size: 1056
     - path: ./data/ogt_protein_classifier/model
-      md5: 16cb7e6c989ad96a5eaa3436b193393a.dir
-      size: 52080402036
+      md5: 69538d364ceaf69a0db731215526f0c7.dir
+      size: 52080402131
       nfiles: 96
     - path: ./data/ogt_protein_classifier/model_metrics.yaml
-      md5: 6a6482c4fb32970e99e81f7e001b7358
-      size: 10722
+      md5: e448e94dbedddb925093ec235fe2ad34
+      size: 10441
   ogt_protein_classifier_data_prep:
     cmd: python pipeline/ogt_protein_classifier_data_prep.py
     deps:
@@ -62,7 +62,7 @@ stages:
         ogt_protein_classifier_data_prep.data_batch_size: 200
         ogt_protein_classifier_data_prep.deduplication:
         - do: true
-        - jaccard: 0.85
+        - jaccard: 0.6
         - kgram: 3
         - num_perm: 100
         ogt_protein_classifier_data_prep.dev_keep_columns: false
@@ -76,9 +76,9 @@ stages:
         ogt_protein_classifier_data_prep.split_type: random
     outs:
     - path: ./data/ogt_protein_classifier/data
-      md5: 58d387f252dc873d27da73a95096a40b.dir
-      size: 31298448
+      md5: 10304ede0e161e56d7347aab5fda76e7.dir
+      size: 30314823
       nfiles: 8
     - path: ./data/ogt_protein_classifier/data_metrics.yaml
-      md5: 7872ffadc366c53c709ba13457335977
-      size: 172
+      md5: 6b4cbb7652435cbe7e87f26c2e14ee67
+      size: 170
