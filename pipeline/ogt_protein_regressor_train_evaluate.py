@@ -1,9 +1,9 @@
-"""Trains and tests a classifier of OGT.
+"""Trains and tests a regressor of OGT.
 
 Parameters:
 - `model`: 'protbert' or 'DeepTP', which model to start with
 - `protocol`: 'head' or 'finetune'
-  - head: will only train a classifier layer head to the base model
+  - head: will only train a regressor layer head to the base model
   - finetune: allows predictor head and base model to be backpropegated
   - bighead: like head but a deeper MLP used for classification
 - `batch_size`: int, batch size for training and evaluation
@@ -49,23 +49,6 @@ else:
 LOGNAME = __file__
 LOGFILE = f'./logs/{os.path.basename(__file__)}.log'
 
-class ImbalanceTrainer(transformers.Trainer):
-    """Trainer using cross entropy loss with imbalanced classes."""
-    def __init__(self, class_weights, *args, **kwargs):
-        self._class_weights = class_weights
-        super().__init__(*args, **kwargs)
-
-    def compute_loss(self, model, inputs, return_outputs=False):
-        if self._class_weights is None:
-            return super().compute_loss(model, inputs, return_outputs)
-        labels = inputs.get("labels")
-        # forward pass
-        outputs = model(**inputs)
-        logits = outputs.get("logits")
-        loss_fct = torch.nn.CrossEntropyLoss(weight=self._class_weights)
-        loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
-        return (loss, outputs) if return_outputs else loss
-
 if __name__ == '__main__':
 
     # get process rank
@@ -81,18 +64,17 @@ if __name__ == '__main__':
 
     # load parameters
     with open("./params.yaml", "r") as stream:
-        params = yaml_load(stream)['ogt_protein_classifier_train_evaluate']
+        params = yaml_load(stream)['ogt_protein_regressor_train_evaluate']
     params['_data_batch_size'] = int(params['batch_size']/CPU_COUNT)
     logger.info(f"Loaded parameters: {params}")
     ds_batch_params = dict(batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
-    
 
     # prepare the main process
     if local_rank not in [-1, 0]:
         torch.distributed.barrier() # non main processes will stop here until the main process co
     else: # only main processes will run here
         # start dvc live. if done later it breaks logs
-        live = dvclive.Live(dir='./data/ogt_protein_classifier/dvclive/', dvcyaml=False, report='md')
+        live = dvclive.Live(dir='./data/ogt_protein_regressor/dvclive/', dvcyaml=False, report='md')
         # loggers
         logger.setLevel(getattr(logging, LOGLEVEL))
         fh = logging.FileHandler(LOGFILE, mode='w')
@@ -104,12 +86,12 @@ if __name__ == '__main__':
         utils_logger.addHandler(fh)
     
         # create dirs
-        if not os.path.exists('./data/ogt_protein_classifier/model'):
-            os.mkdir('./data/ogt_protein_classifier/model')
+        if not os.path.exists('./data/ogt_protein_regressor/model'):
+            os.makedirs('./data/ogt_protein_regressor/model')
 
         # start carbon tracker for data processing
         tracker = codecarbon.OfflineEmissionsTracker( 
-            project_name="train_classifier",
+            project_name="train_regressor",
             output_dir="./data/",
             country_iso_code="USA",
             region="washington"
@@ -123,7 +105,7 @@ if __name__ == '__main__':
     logger.info(f'Using {CPU_COUNT} cpus for multiprocessing')
 
     # get the data
-    data_dict = datasets.load_from_disk('./data/ogt_protein_classifier/data')
+    data_dict = datasets.load_from_disk('./data/ogt_protein_regressor/data')
     logger.info(f"Loaded data: {data_dict}")
 
     # drop spurious columns
@@ -140,14 +122,6 @@ if __name__ == '__main__':
             data_dict['test'] = data_dict['test'].select(range(params["dev_subsample_data"]))
         logger.info(f"Downsample train and test, now sizes {(len(data_dict['train']),len(data_dict['test']))}")
     ########################################
-
-    # class weighting for imbalance
-    train_positives = data_dict['train'].map(lambda e: {'sum': [sum(e['labels'])]}, **ds_batch_params, remove_columns=data_dict['train'].column_names, desc="Counting train positives")
-    train_positives = sum(train_positives['sum'])
-    positive_balance = train_positives/len(data_dict['train'])
-    class_weight = [positive_balance/(1-positive_balance), 1.0]
-    class_weight=torch.tensor(class_weight, dtype=torch.float).to(device)
-    logger.info(f"Weights for class balancing: {class_weight}")
     
     # data format
     data_dict = data_dict.with_format("torch")
@@ -159,7 +133,7 @@ if __name__ == '__main__':
         config = transformers.BertConfig.from_pretrained("Rostlab/prot_bert")
         
         # set hyperparam changes to config
-        config.num_labels = 2
+        config.num_labels = 1 # this hypothetically makes the model loss MSE
         # huggingface trainer sets the whole model to .train() each training step,
         # so we cannot just use .eval() on the model now to turn of bert dropout for a head only model
         # instead manualyl set bert dropout to 0 for a head model.
@@ -179,15 +153,15 @@ if __name__ == '__main__':
         # next check if we are starting from an internal checkpoint of the
         # HF hub one
         # get the checkpoints on disk that are not empty
-        checkpoints  = [f for f in os.listdir('./data/ogt_protein_classifier/model/') if f.startswith('checkpoint')]
-        checkpoints = [f for f in checkpoints if len(os.listdir('./data/ogt_protein_classifier/model/'+f)) > 0]
+        checkpoints  = [f for f in os.listdir('./data/ogt_protein_regressor/model/') if f.startswith('checkpoint')]
+        checkpoints = [f for f in checkpoints if len(os.listdir('./data/ogt_protein_regressor/model/'+f)) > 0]
         if len(checkpoints) == 0:
             logger.info("Using original Protein Bert weights")
             pretrained_weights_location = "Rostlab/prot_bert"
         else:
             checkpoints_nums = [int(c.split('-')[-1]) for c in checkpoints]
             pretrained_weights_location = checkpoints[np.argmax(checkpoints_nums)]
-            pretrained_weights_location = './data/ogt_protein_classifier/model/'+pretrained_weights_location
+            pretrained_weights_location = './data/ogt_protein_regressor/model/'+pretrained_weights_location
             logger.info(f"Using weights loaded from local checkpoint: {pretrained_weights_location}")
         model = model_class.from_pretrained(
             pretrained_weights_location, config=config
@@ -271,22 +245,21 @@ if __name__ == '__main__':
         save_steps=n_steps_per_save,
         evaluation_strategy=save_strategy,
         eval_steps=n_steps_per_save,
-        output_dir='./data/ogt_protein_classifier/model',
+        output_dir='./data/ogt_protein_regressor/model',
         load_best_model_at_end=True
     )
     def compute_metrics(eval_pred):
-        f1=evaluate.load('f1')
-        acc=evaluate.load('accuracy')
-        matt=evaluate.load('matthews_correlation')
-        cfm = evaluate.load("BucketHeadP65/confusion_matrix")
+        mse = evaluate.load('mse')
+        mae = evaluate.load('mae')
+        r2 = evaluate.load('r_squared')
+        spearman = evaluate.load('spearmanr')
 
-        logits, labels = eval_pred
-        predictions = np.argmax(logits, axis=-1)
-        f1_val = f1.compute(predictions=predictions, references=labels)['f1']
-        acc_val = acc.compute(predictions=predictions, references=labels)['accuracy']
-        matt_val = matt.compute(predictions=predictions, references=labels)['matthews_correlation']
-        cfm_val = list(cfm.compute(predictions=predictions, references=labels)['confusion_matrix'].flatten())
-        return {'f1': f1_val, 'accuracy':acc_val, 'matthew': matt_val, 'cfm': cfm_val}
+        predictions, labels = eval_pred
+        mse_val = mse.compute(predictions=predictions, references=labels)['mse']
+        mae_val = mae.compute(predictions=predictions, references=labels)['mae']
+        r2_val = r2.compute(predictions=predictions, references=labels)['r_squared']
+        spearman_val = spearman.compute(predictions=predictions, references=labels)['spearmanr']
+        return {'mse': mse_val, 'mae': mae_val, 'r2': r2_val, 'spearman': spearman_val}
     
     # set up a dvccallback
     if local_rank in [-1, 0]:
@@ -297,8 +270,7 @@ if __name__ == '__main__':
     # send model to device and go
     model.to(device)
     logger.info(f"Model ready for training: {model}")
-    trainer = ImbalanceTrainer(
-        class_weights=class_weight,
+    trainer = transformers.Trainer(
         model=model,
         args=training_args,
         train_dataset=data_dict['train'],
@@ -323,7 +295,7 @@ if __name__ == '__main__':
     # only main process records results
     if local_rank in [-1, 0]:
         # save model
-        model.save_pretrained('./data/ogt_protein_classifier/model')
+        trainer.save_model('./data/ogt_protein_regressor/model/final/')
 
         # add end of training metrics
         metrics=dict(eval_result)
@@ -331,8 +303,8 @@ if __name__ == '__main__':
         metrics.update(training_log)
         emissions=float(tracker.stop())
         metrics['emissions'] = emissions
-        metrics = {'ogt_cfr_model_'+k: v for k, v in metrics.items()}
+        metrics = {'ogt_reg_model_'+k: v for k, v in metrics.items()}
 
         # save metrics
-        with open('./data/ogt_protein_classifier/model_metrics.yaml', "w") as stream:
+        with open('./data/ogt_protein_regressor/model_metrics.yaml', "w") as stream:
             yaml_dump(metrics, stream)

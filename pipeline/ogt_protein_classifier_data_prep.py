@@ -33,8 +33,8 @@ import datasets
 import sklearn.utils
 import codecarbon
 
-if 'SLURM_CPUS_ON_NODE' in os.environ:
-    CPU_COUNT = int(os.environ['SLURM_CPUS_ON_NODE'])
+if 'SLURM_NTASKS' in os.environ:
+    CPU_COUNT = int(os.environ['SLURM_NTASKS'])
 else:
     import multiprocessing
     CPU_COUNT = multiprocessing.cpu_count()
@@ -85,9 +85,11 @@ if __name__ == '__main__':
     ds_batch_params = dict(batched=True, batch_size=params['data_batch_size'], num_proc=CPU_COUNT)
     
     # start carbon tracker for data processing
-    data_tracker = codecarbon.EmissionsTracker( 
-        project_name="data_process",
-        output_dir="./data/ogt_protein_classifier/data",
+    data_tracker = codecarbon.OfflineEmissionsTracker( 
+        project_name="data_prep_classifier",
+        output_dir="./data/",
+        country_iso_code="USA",
+        region="washington"
     )
     data_tracker.start()
 

@@ -154,10 +154,11 @@ def get_balance_data_sizes(n_class_a: int, n_class_b: int, desired_balance: floa
 def regression_bin_undersampling(
     dataset,
     label,
-    n_bins: int=20,
+    num_bins: int=20,
     max_bin_size: Union[int, str]='auto',
+    min_total_data_kept: Union[float, int]=0.5,
     batch_size: int = 500,
-    num_proc: int = 1
+    num_proc: int = 1,
 ):
     """Downsample an imbalanced regression dataset by reducing bin sizes.
     
@@ -165,11 +166,14 @@ def regression_bin_undersampling(
     ----------
     dataset : Huggingface dataset or dict
     label : str, column name containing labels
-    n_bins: int
+    num_bins: int
         Number of bins to consider, uniformly spaced between min and max values
     max_bin_size: "auto" or int
         If auto, smallest bin size is used and all other bins are downsampled to that size.
         Otherwise, bins greater than int are downsamples
+    min_total_data_kept: int
+        If max_bin_size is auto, this is the minimum number of data points to keep
+        The max bin size will be adjusted to meet this requirement
 
     Returns
     -------
@@ -181,46 +185,59 @@ def regression_bin_undersampling(
     batching_params = dict(batched=True, batch_size=batch_size, num_proc=num_proc)
     # first get the minimum and maximum
     def get_min_max_batches(examples):
-        return {'min': min(examples[label]), 'max': max(examples[label])}
-    min_max_batches = dataset.map(get_min_max_batches, desc="Finding min and max label", **batching_params)
+        return {'min': [min(examples[label]),], 'max': [max(examples[label]),]}
+    min_max_batches = dataset.map(get_min_max_batches, remove_columns=dataset.column_names, desc="Finding min and max label", **batching_params)
     min_ = min(min_max_batches['min'])
     max_ = max(min_max_batches['max'])
     logger.info(f"Dataset min, max: {(min_, max_)}")
 
     # create bin edges
-    bin_edges = np.linspace(min_, max_, num=n_bins)
+    bin_edges = np.linspace(min_, max_, num=num_bins)
     # assign bins to data points
     def assign_bins_to_data_batches(examples):
-        examples['bin'] = np.digitize(examples['ogt'], bin_edges)
+        examples['bin'] = np.digitize(examples[label], bin_edges)
         return examples
-    dataset.map(assign_bins_to_data_batches, desc="Assigning bin to examples", **batching_params)
+    dataset = dataset.map(assign_bins_to_data_batches, desc="Assigning bin to examples", **batching_params)
 
     # split data by the bins and get sizes
     split_datasets = {}
     for i in range(len(bin_edges)):
-        split_datasets[i] = dataset.filter(lambda examples: examples['bin']==i, desc=f"Getting data from bin {i}", **batching_params)
+        split_datasets[i] = dataset.filter(lambda examples: np.array(examples['bin'])==i+1, desc=f"Getting data from bin {i}", **batching_params)
     og_bin_sizes = {i: len(ds) for i, ds in split_datasets.items()}
     logger.info(f"Original bin sizes: {og_bin_sizes}")
 
     # find the max bin size for this execution
     if max_bin_size == 'auto':
-        max_bin_size = min(og_bin_sizes.values())
+        if type(min_total_data_kept) == float:
+            min_total_data_kept = int(min_total_data_kept * len(dataset))
+        else:
+            pass
+
+        bin_sizes_sorted = sorted(og_bin_sizes.values())
+        for max_bin_size in bin_sizes_sorted:
+            # check if this would result in too little data
+            if sum([min(max_bin_size, s) for s in bin_sizes_sorted]) >= min_total_data_kept:
+                break
+        logger.info(f"Max bin size: {max_bin_size} used to meet min_total_data_kept of {min_total_data_kept}")
     else:
         pass
 
     # downsample the data now
+    new_split_datasets = {}
     for i, ds in split_datasets.items():
         if len(ds) > max_bin_size:
-            ds = ds.dhuffle()
+            ds = ds.shuffle()
             ds = ds.select(range(max_bin_size))
         else:
             pass
+        new_split_datasets[i] = ds
+    split_datasets = new_split_datasets
     new_bin_sizes = {i: len(ds) for i, ds in split_datasets.items()}
     logger.info(f"New bin sizes: {new_bin_sizes}")
 
     # concatenate the datasets and remove the bin column
     concatenated_datasets = concatenate_datasets(list(split_datasets.values())).shuffle()
-    concatenated_datasets.remove_columns(['bin'])
+    concatenated_datasets = concatenated_datasets.remove_columns(['bin'])
 
     return concatenated_datasets, og_bin_sizes, new_bin_sizes, bin_edges
 

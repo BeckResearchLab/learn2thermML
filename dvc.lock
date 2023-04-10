@@ -82,3 +82,45 @@ stages:
     - path: ./data/ogt_protein_classifier/data_metrics.yaml
       md5: 6b4cbb7652435cbe7e87f26c2e14ee67
       size: 170
+  ogt_protein_regressor_data_prep:
+    cmd: python pipeline/ogt_protein_regressor_data_prep.py
+    deps:
+    - path: ./data/database
+      md5: 3d1fb0c6b918014c9959ebab31ca9c32
+      size: 34096820224
+    - path: ./l2tml_utils/data_utils.py
+      md5: ba2e01531846874788d5dbe899079b1f
+      size: 9557
+    - path: ./l2tml_utils/dataset_deduplication.py
+      md5: 99f75aae0fd91b47a18988dd609b3cc6
+      size: 12357
+    - path: ./pipeline/ogt_protein_regressor_data_prep.py
+      md5: 8e3e2a9d745f06f2c691edc71a9dab47
+      size: 7933
+    params:
+      params.yaml:
+        ogt_protein_regressor_data_prep.balancing:
+        - do: true
+        - max_bin_size: auto
+        - num_bins: 20
+        - min_total_data_kept: 150000
+        ogt_protein_regressor_data_prep.data_batch_size: 200
+        ogt_protein_regressor_data_prep.deduplication:
+        - do: true
+        - jaccard: 0.6
+        - kgram: 3
+        - num_perm: 100
+        ogt_protein_regressor_data_prep.dev_keep_columns: false
+        ogt_protein_regressor_data_prep.dev_sample_init_data: false
+        ogt_protein_regressor_data_prep.max_protein_len: 250
+        ogt_protein_regressor_data_prep.min_protein_len: 50
+        ogt_protein_regressor_data_prep.split_type: random
+        ogt_protein_regressor_data_prep.train_test_frac: 0.1
+    outs:
+    - path: ./data/ogt_protein_regressor/data
+      md5: 26471f1569c9d0acc016a44b42ba301e.dir
+      size: 27220389
+      nfiles: 7
+    - path: ./data/ogt_protein_regressor/data_metrics.yaml
+      md5: 49730eb6d810caef4b83814245945aa4
+      size: 210

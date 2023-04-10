@@ -28,8 +28,8 @@ import datasets
 import sklearn.utils
 import codecarbon
 
-if 'SLURM_CPUS_ON_NODE' in os.environ:
-    CPU_COUNT = int(os.environ['SLURM_CPUS_ON_NODE'])
+if 'SLURM_NTASKS' in os.environ:
+    CPU_COUNT = int(os.environ['SLURM_NTASKS'])
 else:
     import multiprocessing
     CPU_COUNT = multiprocessing.cpu_count()
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     
     # create dirs
     if not os.path.exists('./data/ogt_protein_regressor/data'):
-        os.mkdir('./data/ogt_protein_regressor/data')
+        os.makedirs('./data/ogt_protein_regressor/data')
 
     # device settings
     logger.info(f'Using {CPU_COUNT} cpus for multiprocessing')
@@ -84,9 +84,11 @@ if __name__ == '__main__':
     ds_batch_params = dict(batched=True, batch_size=params['data_batch_size'], num_proc=CPU_COUNT)
     
     # start carbon tracker for data processing
-    data_tracker = codecarbon.EmissionsTracker( 
-        project_name="data_process",
-        output_dir="./data/ogt_protein_regressor/data",
+    data_tracker = codecarbon.OfflineEmissionsTracker( 
+        project_name="data_process_regressor",
+        output_dir="./data/",
+        country_iso_code="USA",
+        region="washington"
     )
     data_tracker.start()
 
@@ -118,13 +120,18 @@ if __name__ == '__main__':
     logger.info(f"Loaded data from database, {len(ds)} total points")
     conn.close()
 
-    # check of we want to do a run with sample of data
-    if params['dev_sample_init_data']:
-        ds = ds.shuffle().select(range(10000))
-        logger.info('Running with a sample of the data')
-    else:
-        pass
-
+    # balance based on OGT
+    if params['balancing']['do']:
+        ds, og_bin_sizes, new_bin_sizes, bin_edges = data_utils.regression_bin_undersampling(
+            dataset=ds,
+            label='ogt',
+            num_bins=params['balancing']['num_bins'],
+            max_bin_size=params['balancing']['max_bin_size'],
+            batch_size=ds_batch_params['batch_size'],
+            num_proc=ds_batch_params['num_proc'],
+            min_total_data_kept=params['balancing']['min_total_data_kept'],
+        )
+    
     # deduplication
     if params['deduplication']['do']:
         logger.info("Deduplicating dataset...")
@@ -141,21 +148,8 @@ if __name__ == '__main__':
     else:
         pass
 
-    # balance based on OGT
-    if params['balancing']['do']:
-        ds, og_bin_sizes, new_bin_sizes, bin_edges = data_utils.regression_bin_undersampling(
-            dataset=ds,
-            label_column='ogt',
-            num_bins=params['balancing']['num_bins'],
-            max_bin_size=params['balancing']['max_bin_size'],
-            batch_size=ds_batch_params['batch_size'],
-            num_proc=ds_batch_params['num_proc'],
-        )
-
-    # rename OGT
-    def rename_ogt(examples):
-        examples['labels'] = examples['ogt']
-    ds = ds.map(rename_ogt, **ds_batch_params, desc="Renaming OGT to labels...")
+    # rename OG
+    ds = ds.rename_column('ogt', 'labels')
     
     # split the data
     splitter = data_utils.DataSplitter(ds)
@@ -165,24 +159,33 @@ if __name__ == '__main__':
 
     # compute some statistics
     # take a small sample
-    train_sample = data_dict['train'].select(range(1000))
-    test_sample = data_dict['test'].select(range(1000))
+    if len(data_dict['train']) > 1000:
+        train_sample = data_dict['train'].select(range(1000))
+    else:
+        train_sample = data_dict['train']
+    if len(data_dict['test']) > 1000:
+        test_sample = data_dict['test'].select(range(1000))
+    else:    
+        test_sample = data_dict['test']
     import matplotlib.pyplot as plt
     import seaborn as sns
-
+    if not os.path.exists('./data/ogt_protein_regressor/data_plots/'):
+        os.makedirs('./data/ogt_protein_regressor/data_plots/')
     fig, ax = plt.subplots()
-    sns.kdeplot(train_sample['ogt'], label="train", ax=ax)
-    sns.kdeplot(test_sample['ogt'], label="test", ax=ax)
+    sns.kdeplot(train_sample['labels'], label="train", ax=ax)
+    sns.kdeplot(test_sample['labels'], label="test", ax=ax)
+    plt.legend()
+    plt.xlabel("OGT")
     plt.savefig('./data/ogt_protein_regressor/data_plots/ogt_kde.png', dpi=300, bbox_inches='tight')
 
-    train_mean, train_std = np.mean(train_sample['ogt']), np.std(train_sample['ogt'])
-    test_mean, test_std = np.mean(test_sample['ogt']), np.std(test_sample['ogt'])
+    train_mean, train_std = np.mean(train_sample['labels']), np.std(train_sample['labels'])
+    test_mean, test_std = np.mean(test_sample['labels']), np.std(test_sample['labels'])
     logger.info(f"Train apx OGT mean, std: {(train_mean, train_std)}")
     logger.info(f"Test apx OGT mean, std: {(test_mean, test_std)}")
     
     # remove unnecessary columns
     if not params['dev_keep_columns']:
-        data_dict = data_dict.remove_columns(['protein_int_index', 'ogt', 'taxa_index', 'taxonomy'])
+        data_dict = data_dict.remove_columns(['protein_int_index', 'taxa_index', 'taxonomy'])
     logger.info(f'Final datasets: {data_dict}')
     data_dict.cleanup_cache_files()
     data_dict.save_to_disk('./data/ogt_protein_regressor/data/')
@@ -191,8 +194,14 @@ if __name__ == '__main__':
     # get co2
     co2 = data_tracker.stop()
 
-    metrics = {'ogt_rgr_data_co2': co2, 'ogt_rgr_data_n_train': len(data_dict['train']), 'ogt_rgr_data_n_test': len(data_dict['test']), 
-        'ogt_rgr_train_mean': train_mean, 'ogt_rgr_train_std': train_std, 'ogt_rgr_test_mean': test_mean, 'ogt_rgr_test_mean': train_std}
+    metrics = {
+        'ogt_rgr_data_co2': float(co2),
+        'ogt_rgr_data_n_train': len(data_dict['train']),
+        'ogt_rgr_data_n_test': len(data_dict['test']), 
+        'ogt_rgr_train_mean': float(train_mean),
+        'ogt_rgr_train_std': float(train_std),
+        'ogt_rgr_test_mean': float(test_mean),
+        'ogt_rgr_test_mean': float(train_std)}
 
     # save metrics
     with open('./data/ogt_protein_regressor/data_metrics.yaml', "w") as stream:
