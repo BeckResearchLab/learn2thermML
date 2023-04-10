@@ -47,7 +47,7 @@ ogt_protein_regressor_data_prep:
   data_batch_size: 200
   dev_keep_columns: false
   dev_sample_init_data: false
-ogt_protein_classifier_train_evaluate:
+ogt_protein_regressor_train_evaluate:
   model: protbert
   protocol: finetune
   dropout: 0.0

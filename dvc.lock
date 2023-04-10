@@ -118,9 +118,9 @@ stages:
         ogt_protein_regressor_data_prep.train_test_frac: 0.1
     outs:
     - path: ./data/ogt_protein_regressor/data
-      md5: 26471f1569c9d0acc016a44b42ba301e.dir
-      size: 27220389
+      md5: e606be7fef30a27c9a44efbf03177e3b.dir
+      size: 27218021
       nfiles: 7
     - path: ./data/ogt_protein_regressor/data_metrics.yaml
-      md5: 49730eb6d810caef4b83814245945aa4
-      size: 210
+      md5: 9c67e992166d6b4d4acb40230e07e221
+      size: 208
