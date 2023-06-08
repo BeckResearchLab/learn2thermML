@@ -272,7 +272,8 @@ if __name__ == '__main__':
         evaluation_strategy=save_strategy,
         eval_steps=n_steps_per_save,
         output_dir='./data/ogt_protein_classifier/model',
-        load_best_model_at_end=True
+        load_best_model_at_end=True,
+        push_to_hub=True
     )
     def compute_metrics(eval_pred):
         f1=evaluate.load('f1')
@@ -319,6 +320,7 @@ if __name__ == '__main__':
     # test it
     eval_result = trainer.evaluate()
     logger.info(f"Evaluation results: {eval_result}")
+    trainer.push_to_hub()
 
     # only main process records results
     if local_rank in [-1, 0]:
