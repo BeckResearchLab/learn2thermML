@@ -96,21 +96,13 @@ if __name__ == '__main__':
     # get the data
     conn = ddb.connect("./data/database")
     # create indexes first
-    conn.execute("CREATE UNIQUE INDEX taxa_index ON taxa (taxa_index)")
-    conn.commit()
-    conn.execute("CREATE INDEX taxa_index_foreign ON proteins (taxa_index)")
-    conn.commit()
     select_statement = f"""SELECT 
-            proteins.protein_int_index,
-            proteins.protein_seq,
-            taxa.ogt,
-            taxa.taxa_index,
-            taxa.taxonomy
+            proteins.pid, proteins.protein_seq, taxa.temperature, taxa.taxid
         FROM proteins
-        INNER JOIN taxa ON (proteins.taxa_index=taxa.taxa_index)
-        WHERE proteins.protein_len<{params['max_protein_len']}
-        AND proteins.protein_len>{params['min_protein_len']}
-        AND taxa.ogt IS NOT NULL"""
+        INNER JOIN taxa ON (proteins.taxid=taxa.taxid)
+        WHERE LENGTH(proteins.protein_seq)<{params['max_protein_len']}
+        AND LENGTH(proteins.protein_seq)>{params['min_protein_len']}
+        AND taxa.temperature IS NOT NULL"""
     if params['dev_sample_init_data']:
         select_statement = select_statement + " USING SAMPLE 100000"
     ds = datasets.Dataset.from_sql(
@@ -125,7 +117,7 @@ if __name__ == '__main__':
     low = params['ogt_window'][0]
     high = params['ogt_window'][1]
     def get_label(examples):
-        ogts = np.array(examples['ogt']).reshape(-1,1)
+        ogts = np.array(examples['temperature']).reshape(-1,1)
         labels = np.ones(ogts.shape) * -1
         labels[ogts <= low] = 0
         labels[ogts >= high] = 1
@@ -203,7 +195,8 @@ if __name__ == '__main__':
 
     # remove unnecessary columns
     if not params['dev_keep_columns']:
-        data_dict = data_dict.remove_columns(['protein_int_index', 'ogt', 'taxa_index', 'taxonomy'])
+        bad_columns = [k for k in data_dict['train'].column_names if k not in['protein_seq', 'labels']]
+        data_dict = data_dict.remove_columns(bad_columns)
     logger.info(f'Final datasets: {data_dict}')
     data_dict.cleanup_cache_files()
     data_dict.save_to_disk('./data/ogt_protein_classifier/data/')

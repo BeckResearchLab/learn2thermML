@@ -69,6 +69,14 @@ if __name__ == '__main__':
     logger.info(f"Loaded parameters: {params}")
     ds_batch_params = dict(batched=True, batch_size=params['_data_batch_size'], num_proc=CPU_COUNT)
 
+    # get the standardization parameters and define function to untransform labels
+    with open("./data/ogt_protein_regressor/data/standardization_params.json", "r") as file:
+        standardization_params = json.load(file)
+    data_mean = standardization_params['mean'].to(device)
+    data_std = standardization_params['std'].to(device)
+    def unstandardize(predictions):
+        return (predictions*data_std) + data_mean
+
     # prepare the main process
     if local_rank not in [-1, 0]:
         torch.distributed.barrier() # non main processes will stop here until the main process co
@@ -246,7 +254,8 @@ if __name__ == '__main__':
         evaluation_strategy=save_strategy,
         eval_steps=n_steps_per_save,
         output_dir='./data/ogt_protein_regressor/model',
-        load_best_model_at_end=True
+        load_best_model_at_end=True,
+        metric_for_best_model='r2'
     )
     def compute_metrics(eval_pred):
         mse = evaluate.load('mse')
@@ -255,9 +264,13 @@ if __name__ == '__main__':
         spearman = evaluate.load('spearmanr')
 
         predictions, labels = eval_pred
+        # unstandardize
+        predictions = unstandardize(predictions)
+        labels = unstandardize(labels)
+
         mse_val = mse.compute(predictions=predictions, references=labels)['mse']
         mae_val = mae.compute(predictions=predictions, references=labels)['mae']
-        r2_val = r2.compute(predictions=predictions, references=labels)['r_squared']
+        r2_val = r2.compute(predictions=predictions, references=labels)
         spearman_val = spearman.compute(predictions=predictions, references=labels)['spearmanr']
         return {'mse': mse_val, 'mae': mae_val, 'r2': r2_val, 'spearman': spearman_val}
     

@@ -47,6 +47,7 @@ stages:
     - ogt_protein_classifier_train_evaluate.grad_checkpointing
     - ogt_protein_classifier_train_evaluate.fp16
     - ogt_protein_classifier_train_evaluate.dev_subsample_data
+    - ogt_protein_classifier_train_evaluate.push
     metrics:
     - ./data/ogt_protein_classifier/model_metrics.yaml:
         cache: false

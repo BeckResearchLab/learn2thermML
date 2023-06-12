@@ -4,59 +4,63 @@ stages:
     cmd: torchrun --nproc_per_node gpu pipeline/ogt_protein_classifier_train_evaluate.py
     deps:
     - path: ./data/ogt_protein_classifier/data
-      md5: c5f4abdaefc74bdbb83fc88f4171b0a0.dir
-      size: 711110983
-      nfiles: 18
+      md5: 01ab7e5da161e6c97c7309d6e9f0fd14.dir
+      size: 1252068169
+      nfiles: 267
     - path: ./l2tml_utils/model_utils.py
       md5: 13c9597c906c8f2291cc7902be3c622d
       size: 4167
     - path: ./pipeline/ogt_protein_classifier_train_evaluate.py
-      md5: a1f4f19ded183929cf9d94d2d639ab7f
-      size: 14570
+      md5: 0fe9b9b90de3b6d2e07ccc2bec59a68c
+      size: 14836
     params:
       params.yaml:
-        ogt_protein_classifier_train_evaluate.batch_size: 40
+        ogt_protein_classifier_train_evaluate.batch_size: 32
         ogt_protein_classifier_train_evaluate.dev_subsample_data: false
-        ogt_protein_classifier_train_evaluate.dropout: 0.0
-        ogt_protein_classifier_train_evaluate.epochs: 1
+        ogt_protein_classifier_train_evaluate.dropout: 0.1
+        ogt_protein_classifier_train_evaluate.epochs: 2
         ogt_protein_classifier_train_evaluate.fp16: true
         ogt_protein_classifier_train_evaluate.grad_accum: 25
         ogt_protein_classifier_train_evaluate.grad_checkpointing: true
         ogt_protein_classifier_train_evaluate.lr: 5e-05
         ogt_protein_classifier_train_evaluate.lr_scheduler: linear
         ogt_protein_classifier_train_evaluate.model: protbert
-        ogt_protein_classifier_train_evaluate.n_save_per_epoch: 20
+        ogt_protein_classifier_train_evaluate.n_save_per_epoch: 10
         ogt_protein_classifier_train_evaluate.protocol: finetune
+        ogt_protein_classifier_train_evaluate.push: true
     outs:
     - path: ./data/ogt_protein_classifier/dvclive/metrics.json
-      md5: d48778e602944635c4c7b73670320f58
-      size: 359
+      md5: a1849642c74214e6f13c86930889eae7
+      size: 344
     - path: ./data/ogt_protein_classifier/dvclive/plots
-      md5: 7ecbc9ec8e360818d39e9ba7fb9e3e7c.dir
-      size: 3107
+      md5: a76967ca24e3e728b167734f941b05ed.dir
+      size: 440
       nfiles: 10
     - path: ./data/ogt_protein_classifier/dvclive/report.md
-      md5: eadf335f91566e5d0226c4426d867311
+      md5: 2c0abc3b96e8c1a68a3ae36901b975c9
       size: 1056
     - path: ./data/ogt_protein_classifier/model
-      md5: 69538d364ceaf69a0db731215526f0c7.dir
-      size: 52080402131
-      nfiles: 96
+      md5: e2f07bdc7e16847ed979477d12001b2f.dir
+      size: 5040086309
+      nfiles: 15
     - path: ./data/ogt_protein_classifier/model_metrics.yaml
-      md5: e448e94dbedddb925093ec235fe2ad34
-      size: 10441
+      md5: 6213a376bf4aa0ba7ba2d67d4e5d9132
+      size: 1566
   ogt_protein_classifier_data_prep:
     cmd: python pipeline/ogt_protein_classifier_data_prep.py
     deps:
     - path: ./data/database
-      md5: 3d1fb0c6b918014c9959ebab31ca9c32
-      size: 34096820224
+      md5: 5192612c6c18eeadaaf37a1ee14f307f
+      size: 9478352896
     - path: ./l2tml_utils/data_utils.py
-      md5: 37c459566103785886ffa2d02f094a7d
-      size: 5836
+      md5: ba2e01531846874788d5dbe899079b1f
+      size: 9557
+    - path: ./l2tml_utils/dataset_deduplication.py
+      md5: 99f75aae0fd91b47a18988dd609b3cc6
+      size: 12357
     - path: ./pipeline/ogt_protein_classifier_data_prep.py
-      md5: 0b1806b93aa61649de75466c70d40747
-      size: 9835
+      md5: 090e7ebe6774ed9aaa08702c8fb16265
+      size: 9695
     params:
       params.yaml:
         ogt_protein_classifier_data_prep.data_batch_size: 200
@@ -74,13 +78,14 @@ stages:
         - 30.0
         - 60.0
         ogt_protein_classifier_data_prep.split_type: random
+        ogt_protein_classifier_data_prep.train_test_frac: 0.1
     outs:
     - path: ./data/ogt_protein_classifier/data
-      md5: 10304ede0e161e56d7347aab5fda76e7.dir
-      size: 30314823
-      nfiles: 8
+      md5: 734ab823facec9792c543289f7681c76.dir
+      size: 53679113
+      nfiles: 7
     - path: ./data/ogt_protein_classifier/data_metrics.yaml
-      md5: 6b4cbb7652435cbe7e87f26c2e14ee67
+      md5: e4667c09e02a45d1cddea31669e48be0
       size: 170
   ogt_protein_regressor_data_prep:
     cmd: python pipeline/ogt_protein_regressor_data_prep.py
@@ -124,3 +129,46 @@ stages:
     - path: ./data/ogt_protein_regressor/data_metrics.yaml
       md5: 9c67e992166d6b4d4acb40230e07e221
       size: 208
+  ogt_protein_regressor_train_evaluate:
+    cmd: torchrun --nproc_per_node gpu pipeline/ogt_protein_regressor_train_evaluate.py
+    deps:
+    - path: ./data/ogt_protein_regressor/data
+      md5: f4b892fb82dec9f31c35b38cd3642b82.dir
+      size: 28094605
+      nfiles: 12
+    - path: ./l2tml_utils/model_utils.py
+      md5: 13c9597c906c8f2291cc7902be3c622d
+      size: 4167
+    - path: ./pipeline/ogt_protein_regressor_train_evaluate.py
+      md5: b8e9532770a2c7bd10fbe6dd9a0448a2
+      size: 13213
+    params:
+      params.yaml:
+        ogt_protein_regressor_train_evaluate.batch_size: 40
+        ogt_protein_regressor_train_evaluate.dev_subsample_data: 80
+        ogt_protein_regressor_train_evaluate.dropout: 0.0
+        ogt_protein_regressor_train_evaluate.epochs: 25
+        ogt_protein_regressor_train_evaluate.fp16: true
+        ogt_protein_regressor_train_evaluate.grad_accum: 1
+        ogt_protein_regressor_train_evaluate.grad_checkpointing: true
+        ogt_protein_regressor_train_evaluate.lr: 5e-05
+        ogt_protein_regressor_train_evaluate.lr_scheduler: linear
+        ogt_protein_regressor_train_evaluate.model: protbert
+        ogt_protein_regressor_train_evaluate.n_save_per_epoch: 1
+        ogt_protein_regressor_train_evaluate.protocol: finetune
+    outs:
+    - path: ./data/ogt_protein_regressor/dvclive/metrics.json
+      md5: 28d3164e35f0861815d61515452dc733
+      size: 376
+    - path: ./data/ogt_protein_regressor/dvclive/plots
+      md5: 216c1251aedffd536260ac93998741ec.dir
+      size: 1577
+      nfiles: 11
+    - path: ./data/ogt_protein_regressor/dvclive/report.md
+      md5: 9aef0d3565cdc8dd3c7b7b300062a089
+      size: 1119
+    - path: ./data/ogt_protein_regressor/model
+      md5: 72fc37f811e9f4e5180f74e8efa491e5.dir
+      size: 15120772283
+      nfiles: 47
+    - path: ./data/ogt_protein_regressor/model_metrics.yaml

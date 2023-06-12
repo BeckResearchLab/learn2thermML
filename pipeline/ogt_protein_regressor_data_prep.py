@@ -19,6 +19,7 @@ import os
 import time
 from yaml import safe_load as yaml_load
 from yaml import dump as yaml_dump
+import json
 import pandas as pd
 import numpy as np
 import duckdb as ddb
@@ -178,11 +179,20 @@ if __name__ == '__main__':
     plt.xlabel("OGT")
     plt.savefig('./data/ogt_protein_regressor/data_plots/ogt_kde.png', dpi=300, bbox_inches='tight')
 
-    train_mean, train_std = np.mean(train_sample['labels']), np.std(train_sample['labels'])
-    test_mean, test_std = np.mean(test_sample['labels']), np.std(test_sample['labels'])
+    train_mean, train_std = np.mean(data_dict['train']['labels']), np.std(data_dict['train']['labels'])
+    test_mean, test_std = np.mean(data_dict['test']['labels']), np.std(data_dict['test']['labels'])
     logger.info(f"Train apx OGT mean, std: {(train_mean, train_std)}")
     logger.info(f"Test apx OGT mean, std: {(test_mean, test_std)}")
-    
+
+    # standardize the label
+    def standardize_labels(examples):
+        examples['labels'] = list((np.array(examples['labels']) - train_mean) / train_std)
+        return examples
+    data_dict = data_dict.map(standardize_labels, desc='Standardizing data', **ds_batch_params)
+    # save the standardization parameters to file
+    with open('./data/ogt_protein_regressor/data/standardization_params.json', 'w') as f:
+        json.dump({'train_mean': train_mean, 'train_std': train_std}, f)
+
     # remove unnecessary columns
     if not params['dev_keep_columns']:
         data_dict = data_dict.remove_columns(['protein_int_index', 'taxa_index', 'taxonomy'])

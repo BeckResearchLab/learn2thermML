@@ -273,7 +273,7 @@ if __name__ == '__main__':
         eval_steps=n_steps_per_save,
         output_dir='./data/ogt_protein_classifier/model',
         load_best_model_at_end=True,
-        push_to_hub=True
+        push_to_hub=False,
     )
     def compute_metrics(eval_pred):
         f1=evaluate.load('f1')
@@ -320,12 +320,15 @@ if __name__ == '__main__':
     # test it
     eval_result = trainer.evaluate()
     logger.info(f"Evaluation results: {eval_result}")
-    trainer.push_to_hub()
-
+    
     # only main process records results
     if local_rank in [-1, 0]:
+        if params['push']:
+            model.push_to_hub('learn2therm')
+            tokenizer.push_to_hub('learn2therm')
         # save model
         model.save_pretrained('./data/ogt_protein_classifier/model')
+        tokenizer.save_pretrained('./data/ogt_protein_classifier/model')
 
         # add end of training metrics
         metrics=dict(eval_result)
