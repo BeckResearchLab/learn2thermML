@@ -30,19 +30,19 @@ stages:
         ogt_protein_classifier_train_evaluate.push: true
     outs:
     - path: ./data/ogt_protein_classifier/dvclive/metrics.json
-      md5: 18db5d99fb504884ca7816d6de012263
-      size: 359
+      md5: cd21b9d67d695a093a915812a5bb178c
+      size: 357
     - path: ./data/ogt_protein_classifier/dvclive/plots
-      md5: 5a503c2b486b24c0725bd4fa17b7638c.dir
-      size: 1571
+      md5: 8c46b9a35595fb68d0707879b48760c0.dir
+      size: 1845
       nfiles: 10
     - path: ./data/ogt_protein_classifier/dvclive/report.md
-      md5: cf70a7dbaf1e914fbd2ced858807e896
+      md5: 00d1242f59aa98805d1b93599bc1dcac
       size: 1056
     - path: ./data/ogt_protein_classifier/model
-      md5: c72cfed3a9c602626de6e7f00c59e98f.dir
-      size: 25200362534
-      nfiles: 67
+      md5: cc902e5949c28ed984c5e0a4d7d62e42.dir
+      size: 30240436701
+      nfiles: 80
     - path: ./data/ogt_protein_classifier/model_metrics.yaml
       md5: 6213a376bf4aa0ba7ba2d67d4e5d9132
       size: 1566
