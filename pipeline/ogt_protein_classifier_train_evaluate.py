@@ -238,16 +238,21 @@ if __name__ == '__main__':
         torch.distributed.barrier() 
 
     # compute the saving and evaluation timeframe
-    n_steps_per_epoch = int(len(data_dict['train']) / params['batch_size'])
+    n_gpus = torch.cuda.device_count()
     if params['grad_accum']:
-        n_steps_per_epoch = int(n_steps_per_epoch/params['grad_accum'])
+        grad_accum = params['grad_accum']
+    else:
+        grad_accum = 1
+    total_data_per_step = params['batch_size']*grad_accum*n_gpus
+    steps_per_epoch = int(len(data_dict['train'])/total_data_per_step)
+
     if params['n_save_per_epoch'] == 0:
         n_steps_per_save = None
         save_strategy = 'no'
     else:
         save_strategy = 'steps'
-        n_steps_per_save = int(n_steps_per_epoch/params['n_save_per_epoch'])
-    logger.info(f"Saving/evaluating every {n_steps_per_save} batches of size {params['batch_size']}")
+        n_steps_per_save = int(steps_per_epoch/params['n_save_per_epoch'])
+    logger.info(f"Saving/evaluating every {n_steps_per_save} steps of size {total_data_per_step}")
     
     # ready the train
     training_args = transformers.TrainingArguments(
