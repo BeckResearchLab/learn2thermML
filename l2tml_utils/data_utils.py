@@ -60,10 +60,10 @@ class DataSplitter:
             self.dataset = self.dataset.map(apply_add_taxlvl_column)
             # we are splitting with groups specified by this new column
             splitting_col = 'tax_at_level'
-        elif splittype == 'taxa_id':
+        elif splittype == 'taxid':
             logger.info('Splitting dataset by taxa with test frac {frac}')
             if splitting_col is None:
-                splitting_col = 'taxa_index'
+                splitting_col = 'taxid'
         else:
             raise ValueError(
                 f"Cannot interpret `splittype={splittype}`, see docs")
