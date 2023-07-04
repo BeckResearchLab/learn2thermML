@@ -158,19 +158,19 @@ stages:
         ogt_protein_regressor_train_evaluate.protocol: finetune
     outs:
     - path: ./data/ogt_protein_regressor/dvclive/metrics.json
-      md5: b3225e7c655768bb11d179bc7028fca5
-      size: 366
+      md5: 137dfb20d6a8ed547e8c77232fe2c272
+      size: 365
     - path: ./data/ogt_protein_regressor/dvclive/plots
-      md5: f385bcc36cce8121e9b5ec18d35e01e1.dir
-      size: 2476
+      md5: 334ea705077adafbe641d8f32839391f.dir
+      size: 2755
       nfiles: 11
     - path: ./data/ogt_protein_regressor/dvclive/report.md
-      md5: d5661e6dd6483135782e380f9771e686
+      md5: d1ae39287d215e8a707dd3be20bb28b4
       size: 1116
     - path: ./data/ogt_protein_regressor/model
-      md5: 87a4e65dc94cc7b15e6bf73206138c6b.dir
-      size: 40320472357
-      nfiles: 106
+      md5: 0f23db0dadc2b4c2dd481bd20ad28051.dir
+      size: 45360533370
+      nfiles: 119
     - path: ./data/ogt_protein_regressor/model_metrics.yaml
       md5: 107198f05470515a8a11d074421b1609
       size: 1286
