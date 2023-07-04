@@ -1,7 +1,7 @@
 """Trains and tests a regressor of OGT.
 
 Parameters:
-- `split_type`: 'random', 'taxa_id', int
+- `split_type`: 'random', 'taxaid', int
   - random: randomly splits proteins into train and dev
   - taxa_id: keeps proteins from a particular organism together
   - int: clusters taxa by taxonomy of a particular level, 1 is kingdom, 2 is phylum, etc. Note that this may have errors, as it is based on taxonomy specified in NCBI which sometimes has ambiquity
@@ -96,23 +96,18 @@ if __name__ == '__main__':
     # get the data
     conn = ddb.connect("./data/database")
     # create indexes first
-    conn.execute("CREATE UNIQUE INDEX taxa_index ON taxa (taxa_index)")
-    conn.commit()
-    conn.execute("CREATE INDEX taxa_index_foreign ON proteins (taxa_index)")
-    conn.commit()
     select_statement = f"""SELECT 
-            proteins.protein_int_index,
+            proteins.pid,
             proteins.protein_seq,
-            taxa.ogt,
-            taxa.taxa_index,
-            taxa.taxonomy
+            taxa.temperature,
+            taxa.taxid,
         FROM proteins
-        INNER JOIN taxa ON (proteins.taxa_index=taxa.taxa_index)
-        WHERE proteins.protein_len<{params['max_protein_len']}
-        AND proteins.protein_len>{params['min_protein_len']}
-        AND taxa.ogt IS NOT NULL"""
+        INNER JOIN taxa ON (proteins.taxid=taxa.taxid)
+        WHERE LEN(proteins.protein_seq)<={params['max_protein_len']}
+        AND LEN(proteins.protein_seq)>{params['min_protein_len']}
+        AND taxa.temperature IS NOT NULL"""
     if params['dev_sample_init_data']:
-        select_statement = select_statement + " USING SAMPLE 100000"
+        select_statement = select_statement + f" USING SAMPLE {params['dev_sample_init_data']}"
     ds = datasets.Dataset.from_sql(
         select_statement,
         config_name='test',
@@ -125,7 +120,7 @@ if __name__ == '__main__':
     if params['balancing']['do']:
         ds, og_bin_sizes, new_bin_sizes, bin_edges = data_utils.regression_bin_undersampling(
             dataset=ds,
-            label='ogt',
+            label='temperature',
             num_bins=params['balancing']['num_bins'],
             max_bin_size=params['balancing']['max_bin_size'],
             batch_size=ds_batch_params['batch_size'],
@@ -148,11 +143,12 @@ if __name__ == '__main__':
         )
     else:
         pass
-
+    logger.info(f"Dataset has {len(ds)} points after deduplication.")
     # rename OG
-    ds = ds.rename_column('ogt', 'labels')
+    ds = ds.rename_column('temperature', 'labels')
     
     # split the data
+    ds = ds.shuffle()
     splitter = data_utils.DataSplitter(ds)
     data_dict = splitter.split(splittype=params['split_type'], frac=params['train_test_frac'])
     data_dict = data_dict.shuffle()
@@ -160,11 +156,11 @@ if __name__ == '__main__':
 
     # compute some statistics
     # take a small sample
-    if len(data_dict['train']) > 1000:
+    if len(data_dict['train']) > 5000:
         train_sample = data_dict['train'].select(range(1000))
     else:
         train_sample = data_dict['train']
-    if len(data_dict['test']) > 1000:
+    if len(data_dict['test']) > 5000:
         test_sample = data_dict['test'].select(range(1000))
     else:    
         test_sample = data_dict['test']
@@ -179,23 +175,25 @@ if __name__ == '__main__':
     plt.xlabel("OGT")
     plt.savefig('./data/ogt_protein_regressor/data_plots/ogt_kde.png', dpi=300, bbox_inches='tight')
 
-    train_mean, train_std = np.mean(data_dict['train']['labels']), np.std(data_dict['train']['labels'])
-    test_mean, test_std = np.mean(data_dict['test']['labels']), np.std(data_dict['test']['labels'])
-    logger.info(f"Train apx OGT mean, std: {(train_mean, train_std)}")
-    logger.info(f"Test apx OGT mean, std: {(test_mean, test_std)}")
+    train_mean, train_std = float(np.mean(data_dict['train']['labels'])), float(np.std(data_dict['train']['labels']))
+    test_mean, test_std = float(np.mean(data_dict['test']['labels'])), float(np.std(data_dict['test']['labels']))
+    logger.info(f"Train OGT mean, std: {(train_mean, train_std)}")
+    logger.info(f"Test OGT mean, std: {(test_mean, test_std)}")
 
     # standardize the label
     def standardize_labels(examples):
-        examples['labels'] = list((np.array(examples['labels']) - train_mean) / train_std)
+        examples['labels'] = (examples['labels'] - train_mean) / train_std
         return examples
-    data_dict = data_dict.map(standardize_labels, desc='Standardizing data', **ds_batch_params)
+    data_dict = data_dict.map(standardize_labels, desc='Standardizing data', batched=False)
     # save the standardization parameters to file
     with open('./data/ogt_protein_regressor/data/standardization_params.json', 'w') as f:
         json.dump({'train_mean': train_mean, 'train_std': train_std}, f)
 
     # remove unnecessary columns
     if not params['dev_keep_columns']:
-        data_dict = data_dict.remove_columns(['protein_int_index', 'taxa_index', 'taxonomy'])
+        bad_columns = [k for k in data_dict['train'].column_names if k not in['protein_seq', 'labels']]
+        data_dict = data_dict.remove_columns(bad_columns)
+
     logger.info(f'Final datasets: {data_dict}')
     data_dict.cleanup_cache_files()
     data_dict.save_to_disk('./data/ogt_protein_regressor/data/')

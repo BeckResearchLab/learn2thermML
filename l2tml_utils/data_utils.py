@@ -61,7 +61,7 @@ class DataSplitter:
             # we are splitting with groups specified by this new column
             splitting_col = 'tax_at_level'
         elif splittype == 'taxid':
-            logger.info('Splitting dataset by taxa with test frac {frac}')
+            logger.info(f'Splitting dataset by taxa with test frac {frac}')
             if splitting_col is None:
                 splitting_col = 'taxid'
         else:
@@ -75,6 +75,7 @@ class DataSplitter:
             pass
         train = self.dataset.select(train_indexes)
         test = self.dataset.select(test_indexes)
+        logger.info(f"Split dataset into train: {len(train)}, test: {len(test)}")
 
         return DatasetDict({'train':train, 'test':test})
 

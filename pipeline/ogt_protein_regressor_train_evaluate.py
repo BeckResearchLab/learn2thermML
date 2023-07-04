@@ -22,6 +22,7 @@ from yaml import dump as yaml_dump
 import pandas as pd
 import numpy as np
 import re
+import json
 
 import datasets
 import transformers
@@ -72,10 +73,10 @@ if __name__ == '__main__':
     # get the standardization parameters and define function to untransform labels
     with open("./data/ogt_protein_regressor/data/standardization_params.json", "r") as file:
         standardization_params = json.load(file)
-    data_mean = standardization_params['mean'].to(device)
-    data_std = standardization_params['std'].to(device)
+    data_mean = torch.tensor(standardization_params['train_mean'], dtype=torch.float).to(device)
+    data_std = torch.tensor(standardization_params['train_std'], dtype=torch.float).to(device)
     def unstandardize(predictions):
-        return (predictions*data_std) + data_mean
+        return (torch.tensor(predictions).to(device)*data_std) + data_mean
 
     # prepare the main process
     if local_rank not in [-1, 0]:
@@ -220,16 +221,21 @@ if __name__ == '__main__':
         torch.distributed.barrier() 
 
     # compute the saving and evaluation timeframe
-    n_steps_per_epoch = int(len(data_dict['train']) / params['batch_size'])
+    n_gpus = torch.cuda.device_count()
     if params['grad_accum']:
-        n_steps_per_epoch = int(n_steps_per_epoch/params['grad_accum'])
+        grad_accum = params['grad_accum']
+    else:
+        grad_accum = 1
+    total_data_per_step = params['batch_size']*grad_accum*n_gpus
+    steps_per_epoch = int(len(data_dict['train'])/total_data_per_step)
+
     if params['n_save_per_epoch'] == 0:
         n_steps_per_save = None
         save_strategy = 'no'
     else:
         save_strategy = 'steps'
-        n_steps_per_save = int(n_steps_per_epoch/params['n_save_per_epoch'])
-    logger.info(f"Saving/evaluating every {n_steps_per_save} batches of size {params['batch_size']}")
+        n_steps_per_save = int(steps_per_epoch/params['n_save_per_epoch'])
+    logger.info(f"Saving/evaluating every {n_steps_per_save} steps of size {total_data_per_step}")
     
     # ready the train
     training_args = transformers.TrainingArguments(
@@ -274,9 +280,26 @@ if __name__ == '__main__':
         spearman_val = spearman.compute(predictions=predictions, references=labels)['spearmanr']
         return {'mse': mse_val, 'mae': mae_val, 'r2': r2_val, 'spearman': spearman_val}
     
-    # set up a dvccallback
+    # set up a dvccallback and compute null model
     if local_rank in [-1, 0]:
         callbacks = [model_utils.DVCLiveCallback(live)]
+
+        def get_null_err(batch):
+            return {"pred":[0.0]*len(batch['labels']), "err": 0.0 - batch['labels']}
+        def sum_and_square_sum_err(batch):
+            return {"sum": [float(torch.sum(batch['err']))], "square_sum": [float(torch.sum(torch.square(batch['err'])))], "n": [int(torch.tensor(len(batch['err'])))]}
+        train_errs = data_dict['train'].map(get_null_err, remove_columns=data_dict['train'].column_names, batched=True)
+        null_train_sums = train_errs.map(sum_and_square_sum_err, remove_columns=train_errs.column_names, batched=True)
+        # Calculate the training mean (standardized)
+        total_sum = np.sum([batch["sum"] for batch in null_train_sums])
+        total_square_sum = np.sum([batch["square_sum"] for batch in null_train_sums])
+        n = np.sum([batch["n"] for batch in null_train_sums])
+        null_loss= total_square_sum / n
+
+        test_preds = data_dict['test'].map(get_null_err, remove_columns=data_dict['test'].column_names, batched=True)['pred'].to(device)
+
+        logger.info(f"Null model training loss: {null_loss}")
+        logger.info(f"Null model eval stats: {compute_metrics((test_preds, data_dict['test']['labels'].to(device)))}")
     else:
         callbacks = None
 

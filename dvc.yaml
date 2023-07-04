@@ -2,81 +2,83 @@ stages:
   ogt_protein_classifier_data_prep:
     cmd: python pipeline/ogt_protein_classifier_data_prep.py
     deps:
-      - ./pipeline/ogt_protein_classifier_data_prep.py
-      - ./data/database
-      - ./l2tml_utils/data_utils.py
-      - ./l2tml_utils/dataset_deduplication.py
+    - ./data/database
+    - ./l2tml_utils/data_utils.py
+    - ./l2tml_utils/dataset_deduplication.py
+    - ./pipeline/ogt_protein_classifier_data_prep.py
     outs:
-      - ./data/ogt_protein_classifier/data
+    - ./data/ogt_protein_classifier/data
     params:
-      - ogt_protein_classifier_data_prep.split_type
-      - ogt_protein_classifier_data_prep.train_test_frac
-      - ogt_protein_classifier_data_prep.ogt_window
-      - ogt_protein_classifier_data_prep.max_protein_len
-      - ogt_protein_classifier_data_prep.min_balance
-      - ogt_protein_classifier_data_prep.max_upsampling
-      - ogt_protein_classifier_data_prep.deduplication
-      - ogt_protein_classifier_data_prep.data_batch_size
-      - ogt_protein_classifier_data_prep.dev_keep_columns
-      - ogt_protein_classifier_data_prep.dev_sample_init_data
+    - ogt_protein_classifier_data_prep.data_batch_size
+    - ogt_protein_classifier_data_prep.deduplication
+    - ogt_protein_classifier_data_prep.dev_keep_columns
+    - ogt_protein_classifier_data_prep.dev_sample_init_data
+    - ogt_protein_classifier_data_prep.max_protein_len
+    - ogt_protein_classifier_data_prep.max_upsampling
+    - ogt_protein_classifier_data_prep.min_balance
+    - ogt_protein_classifier_data_prep.ogt_window
+    - ogt_protein_classifier_data_prep.split_type
+    - ogt_protein_classifier_data_prep.train_test_frac
     metrics:
     - ./data/ogt_protein_classifier/data_metrics.yaml:
         cache: false
+    frozen: true
   ogt_protein_classifier_train_evaluate:
     cmd: torchrun --nproc_per_node gpu pipeline/ogt_protein_classifier_train_evaluate.py
     deps:
-    - ./pipeline/ogt_protein_classifier_train_evaluate.py
-    - ./l2tml_utils/model_utils.py
     - ./data/ogt_protein_classifier/data
+    - ./l2tml_utils/model_utils.py
+    - ./pipeline/ogt_protein_classifier_train_evaluate.py
     outs:
-    - ./data/ogt_protein_classifier/model:
-        checkpoint: true
     - ./data/ogt_protein_classifier/dvclive/report.md:
         cache: false
         persist: true
+    - ./data/ogt_protein_classifier/model:
+        checkpoint: true
     params:
-    - ogt_protein_classifier_train_evaluate.model
-    - ogt_protein_classifier_train_evaluate.protocol
     - ogt_protein_classifier_train_evaluate.batch_size
-    - ogt_protein_classifier_train_evaluate.epochs
-    - ogt_protein_classifier_train_evaluate.n_save_per_epoch
+    - ogt_protein_classifier_train_evaluate.dev_subsample_data
     - ogt_protein_classifier_train_evaluate.dropout
-    - ogt_protein_classifier_train_evaluate.lr_scheduler
-    - ogt_protein_classifier_train_evaluate.lr
+    - ogt_protein_classifier_train_evaluate.epochs
+    - ogt_protein_classifier_train_evaluate.fp16
     - ogt_protein_classifier_train_evaluate.grad_accum
     - ogt_protein_classifier_train_evaluate.grad_checkpointing
-    - ogt_protein_classifier_train_evaluate.fp16
-    - ogt_protein_classifier_train_evaluate.dev_subsample_data
+    - ogt_protein_classifier_train_evaluate.lr
+    - ogt_protein_classifier_train_evaluate.lr_scheduler
+    - ogt_protein_classifier_train_evaluate.model
+    - ogt_protein_classifier_train_evaluate.n_save_per_epoch
+    - ogt_protein_classifier_train_evaluate.protocol
     - ogt_protein_classifier_train_evaluate.push
     metrics:
-    - ./data/ogt_protein_classifier/model_metrics.yaml:
-        cache: false
     - ./data/ogt_protein_classifier/dvclive/metrics.json:
         cache: false
         persist: true
+    - ./data/ogt_protein_classifier/model_metrics.yaml:
+        cache: false
     plots:
-      - ./data/ogt_protein_classifier/dvclive/plots:
-          cache: false
-          persist: true
+    - ./data/ogt_protein_classifier/dvclive/plots:
+        cache: false
+        persist: true
+    frozen: true
   ogt_protein_regressor_data_prep:
     cmd: python pipeline/ogt_protein_regressor_data_prep.py
     deps:
-      - ./pipeline/ogt_protein_regressor_data_prep.py
-      - ./data/database
-      - ./l2tml_utils/data_utils.py
-      - ./l2tml_utils/dataset_deduplication.py
+    - ./pipeline/ogt_protein_regressor_data_prep.py
+    - ./data/database
+    - ./l2tml_utils/data_utils.py
+    - ./l2tml_utils/dataset_deduplication.py
     outs:
-      - ./data/ogt_protein_regressor/data
+    - ./data/ogt_protein_regressor/data
     params:
-      - ogt_protein_regressor_data_prep.split_type
-      - ogt_protein_regressor_data_prep.train_test_frac
-      - ogt_protein_regressor_data_prep.max_protein_len
-      - ogt_protein_regressor_data_prep.min_protein_len
-      - ogt_protein_regressor_data_prep.balancing
-      - ogt_protein_regressor_data_prep.deduplication
-      - ogt_protein_regressor_data_prep.data_batch_size
-      - ogt_protein_regressor_data_prep.dev_keep_columns
-      - ogt_protein_regressor_data_prep.dev_sample_init_data
+    - ogt_protein_regressor_data_prep.split_type
+    - ogt_protein_regressor_data_prep.train_test_frac
+    - ogt_protein_regressor_data_prep.max_protein_len
+    - ogt_protein_regressor_data_prep.min_protein_len
+    - ogt_protein_regressor_data_prep.balancing
+    - ogt_protein_regressor_data_prep.deduplication
+    - ogt_protein_regressor_data_prep.data_batch_size
+    - ogt_protein_regressor_data_prep.dev_keep_columns
+    - ogt_protein_regressor_data_prep.dev_sample_init_data
     metrics:
     - ./data/ogt_protein_regressor/data_metrics.yaml:
         cache: false
@@ -112,6 +114,6 @@ stages:
         cache: false
         persist: true
     plots:
-      - ./data/ogt_protein_regressor/dvclive/plots:
-          cache: false
-          persist: true
+    - ./data/ogt_protein_regressor/dvclive/plots:
+        cache: false
+        persist: true
