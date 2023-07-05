@@ -261,7 +261,7 @@ if __name__ == '__main__':
         eval_steps=n_steps_per_save,
         output_dir='./data/ogt_protein_regressor/model',
         load_best_model_at_end=True,
-        metric_for_best_model='r2'
+        metric_for_best_model='eval_r2'
     )
     def compute_metrics(eval_pred):
         mse = evaluate.load('mse')

@@ -140,37 +140,77 @@ stages:
       md5: 13c9597c906c8f2291cc7902be3c622d
       size: 4167
     - path: ./pipeline/ogt_protein_regressor_train_evaluate.py
-      md5: 51dc0b0fc2ab808f6a3c59aa8a13d411
-      size: 15190
+      md5: 5202b17e52f610981e62bbb6cc4d4d3a
+      size: 15195
     params:
       params.yaml:
         ogt_protein_regressor_train_evaluate.batch_size: 32
         ogt_protein_regressor_train_evaluate.dev_subsample_data: false
         ogt_protein_regressor_train_evaluate.dropout: 0.0
-        ogt_protein_regressor_train_evaluate.epochs: 2
+        ogt_protein_regressor_train_evaluate.epochs: 1
         ogt_protein_regressor_train_evaluate.fp16: true
         ogt_protein_regressor_train_evaluate.grad_accum: 25
         ogt_protein_regressor_train_evaluate.grad_checkpointing: true
-        ogt_protein_regressor_train_evaluate.lr: 5e-05
+        ogt_protein_regressor_train_evaluate.lr: 1e-05
         ogt_protein_regressor_train_evaluate.lr_scheduler: linear
         ogt_protein_regressor_train_evaluate.model: protbert
         ogt_protein_regressor_train_evaluate.n_save_per_epoch: 10
         ogt_protein_regressor_train_evaluate.protocol: finetune
     outs:
     - path: ./data/ogt_protein_regressor/dvclive/metrics.json
-      md5: 137dfb20d6a8ed547e8c77232fe2c272
-      size: 365
+      md5: a8720ee6f08cefa244a3acc3cfec0ebc
+      size: 364
     - path: ./data/ogt_protein_regressor/dvclive/plots
-      md5: 334ea705077adafbe641d8f32839391f.dir
-      size: 2755
+      md5: fd3d3a2fa1001e46338527cbe5b7ef8a.dir
+      size: 3143
       nfiles: 11
     - path: ./data/ogt_protein_regressor/dvclive/report.md
-      md5: d1ae39287d215e8a707dd3be20bb28b4
+      md5: 28021e7f51b7013bf37c643841f270bd
       size: 1116
     - path: ./data/ogt_protein_regressor/model
-      md5: 0f23db0dadc2b4c2dd481bd20ad28051.dir
-      size: 45360533370
-      nfiles: 119
+      md5: 4d6cfc6266e573cb295d8e33e67d04da.dir
+      size: 52080836240
+      nfiles: 138
     - path: ./data/ogt_protein_regressor/model_metrics.yaml
-      md5: 107198f05470515a8a11d074421b1609
-      size: 1286
+      md5: f42805dcd37a84e4ea3af6371dae25d6
+      size: 4955
+  ogt_protein_regressor_predict:
+    cmd: python ./pipeline/ogt_protein_regressor_predict.py
+    deps:
+    - path: ./data/ogt_protein_regressor/data
+      md5: 2dca9bd770480a10a661cd1cdb4082f4.dir
+      size: 765053329
+      nfiles: 225
+    - path: ./data/ogt_protein_regressor/model
+      md5: 3ec1a2961551984d87cb04c8c5cf4305.dir
+      size: 52080836896
+      nfiles: 138
+    - path: ./pipeline/ogt_protein_regressor_predict.py
+      hash: md5
+      md5: 936aaf980e6f95a544f8156470629c31
+      size: 9446
+    outs:
+    - path: ./data/ogt_protein_regressor/error_bins.png
+      hash: md5
+      md5: 48fe1c0e4cfe41deab768a6691f98df3
+      size: 110953
+    - path: ./data/ogt_protein_regressor/error_bounds.png
+      hash: md5
+      md5: 2574722657e566b8ef505ffe4ac0edda
+      size: 128690
+    - path: ./data/ogt_protein_regressor/error_confidence.png
+      hash: md5
+      md5: 9612eceba55f0f19247ae9ce0a2318ad
+      size: 121694
+    - path: ./data/ogt_protein_regressor/error_dist.png
+      hash: md5
+      md5: 2126de576972480a6dbcdab3dbd5d99a
+      size: 70150
+    - path: ./data/ogt_protein_regressor/prediction_dist.png
+      hash: md5
+      md5: b804deb59b2eb7f75acfd173da3819fb
+      size: 129336
+    - path: ./data/ogt_protein_regressor/prediction_scatter.png
+      hash: md5
+      md5: 1595522dff0f27b4e7f34385ccef551d
+      size: 400532

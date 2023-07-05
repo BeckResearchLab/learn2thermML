@@ -117,3 +117,31 @@ stages:
     - ./data/ogt_protein_regressor/dvclive/plots:
         cache: false
         persist: true
+  ogt_protein_regressor_predict:
+    cmd: python ./pipeline/ogt_protein_regressor_predict.py
+    deps:
+    - ./data/ogt_protein_regressor/model
+    - ./data/ogt_protein_regressor/data
+    - ./pipeline/ogt_protein_regressor_predict.py
+    plots:
+    - ./data/ogt_protein_regressor/prediction_dist.png:
+        cache: false
+        persist: true
+    - ./data/ogt_protein_regressor/prediction_scatter.png:
+        cache: false
+        persist: true
+    - ./data/ogt_protein_regressor/error_dist.png:
+        cache: false
+        persist: true
+    - ./data/ogt_protein_regressor/error_bins.png:
+        cache: false
+        persist: true
+    - ./data/ogt_protein_regressor/error_confidence.png:
+        cache: false
+        persist: true
+    - ./data/ogt_protein_regressor/error_bounds.png:
+        cache: false
+        persist: true
+    
+    
+    
