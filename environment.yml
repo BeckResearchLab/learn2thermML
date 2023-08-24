@@ -28,4 +28,5 @@ dependencies:
     - dpu_utils
     - nltk
     - git-lfs
+    - statsmodels
 
